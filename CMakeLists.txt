@@ -5,7 +5,7 @@ set(CMAKE_CXX_STANDARD 17)
 
 set(CMAKE_C_FLAGS "-g -Wall")
 
-add_executable(zadanie_2 server.cpp)
+add_executable(zadanie_2 main.cpp server.cpp server.h board.cpp board.h Utils.cpp Utils.h PollUtils.h PollUtils.cpp)
 
 add_library(err err.c)
 
@@ -16,5 +16,8 @@ macro (add_executable _name)
     endif()
 endmacro()
 
-add_executable(echo-server echo-server.c)
-add_executable(echo-client echo-client.c)
+add_executable(echo-server examples/echo-server-udp.c)
+add_executable(echo-client examples/echo-client-udp.c)
+add_executable(beej-listener examples/listener.c)
+add_executable(beej-talker examples/talker.c)
+add_executable(beej-poll-erver examples/poll_server_beej.c)
