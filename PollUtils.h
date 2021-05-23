@@ -12,32 +12,41 @@
 
 class PollUtils {
     static constexpr int N_DESC = 3;
+    static constexpr int TIMEOUT_MS = 2000;
+    struct pollfd pollData[N_DESC];
 public:
     static constexpr int MESSAGE_CLIENT = 0;
     static constexpr int TIMEOUT_CLIENT = 1;
     static constexpr int TIMEOUT_ROUND = 2;
-private:
-    static constexpr int TIMEOUT_MS = 2000;
 
-    struct pollfd poll_data[N_DESC];
+    PollUtils() = default; // A bad practise of sorts
 
-    PollUtils(int socket, int rounds_per_sec) {
-        poll_data[MESSAGE_CLIENT].fd = socket;
-        poll_data[MESSAGE_CLIENT].events = POLLIN;
+    PollUtils(int socket, int roundsPerSec) {
+        pollData[MESSAGE_CLIENT].fd = socket;
+        pollData[MESSAGE_CLIENT].events = POLLIN;
 
-        poll_data[TIMEOUT_CLIENT].fd = get_timeout_fd(Utils::TIMEOUT_CLIENTS_SEC / 2, 0);
-        poll_data[TIMEOUT_CLIENT].events = POLLIN;
+        if (Utils::NUMBER_OF_TICKS > Utils::TIMEOUT_CLIENTS_SEC) {
+            long nanoTimeoutClients = Utils::TIMEOUT_CLIENTS_SEC * 1e9 / Utils::NUMBER_OF_TICKS;
+            pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(0, nanoTimeoutClients)
+        } else {
+            pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(Utils::TIMEOUT_CLIENTS_SEC / Utils::NUMBER_OF_TICKS, 0);
+        }
 
-        long nano_timeout_rounds = 1e9 / rounds_per_sec;
-        poll_data[TIMEOUT_ROUND].fd = get_timeout_fd(0, nano_timeout_rounds);
-        poll_data[TIMEOUT_ROUND].events = POLLIN;
+        pollData[TIMEOUT_CLIENT].events = POLLIN;
+
+        if (roundsPerSec > 1) {
+            long nanoTimeoutRounds = 1e9 / roundsPerSec;
+            pollData[TIMEOUT_ROUND].fd = getTimeoutFd(0, nanoTimeoutRounds);
+        } else {
+            pollData[TIMEOUT_ROUND].fd = getTimeoutFd(1, 0);
+        }
+        pollData[TIMEOUT_ROUND].events = POLLIN;
     }
-
-    static int get_timeout_fd(__time_t tv_sec, long tv_nsec) {
+private:
+    static int getTimeoutFd(__time_t tv_sec, long tv_nsec) {
         int fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
         if (fd < 0)
             syserr("timerfd_create");
-
 
         struct itimerspec interval;
         interval.it_interval.tv_sec = tv_sec;
@@ -51,24 +60,38 @@ private:
     }
 
 public:
-    int do_poll() {
-        return poll(poll_data, N_DESC, TIMEOUT_MS);
+    int doPoll() {
+        return poll(pollData, N_DESC, TIMEOUT_MS);
     }
 
-    bool has_pollin_occurr(int index) {
-        return poll_data[index].revents & POLLIN;
+    bool hasPollinOccurred(int index) {
+        return pollData[index].revents & POLLIN;
     }
 
-    bool check_error() {
+    bool checkError() {
         for(int i = 0; i < N_DESC; i++) {
-            if (poll_data[i].revents & POLLERR) {
+            if (pollData[i].revents & POLLERR) {
                 return true;
             }
         }
         return false;
     }
 
-    int get_number_of_expirations(int index);
+    int getNumberOfExpirations(int index) {
+        return 0;
+    }
+
+    int getDescriptor(int index) {
+        return pollData[index].fd;
+    }
+
+    ~PollUtils() {
+        for (auto & i : pollData) {
+            if (close(i.fd)) {
+                syserr("Poll data close!");
+            }
+        }
+    }
 };
 
 

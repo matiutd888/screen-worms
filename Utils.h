@@ -19,6 +19,7 @@ public:
     static constexpr int TIMEOUT_CLIENTS_SEC = 2;
     static constexpr int DEFAULT_ROUNDS_PER_SEC = 50;
 
+    static constexpr int NUMBER_OF_TICKS = 2;
 };
 
 
