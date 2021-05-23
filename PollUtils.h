@@ -27,7 +27,7 @@ public:
 
         if (Utils::NUMBER_OF_TICKS > Utils::TIMEOUT_CLIENTS_SEC) {
             long nanoTimeoutClients = Utils::TIMEOUT_CLIENTS_SEC * 1e9 / Utils::NUMBER_OF_TICKS;
-            pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(0, nanoTimeoutClients)
+            pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(0, nanoTimeoutClients);
         } else {
             pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(Utils::TIMEOUT_CLIENTS_SEC / Utils::NUMBER_OF_TICKS, 0);
         }
@@ -43,7 +43,7 @@ public:
         pollData[TIMEOUT_ROUND].events = POLLIN;
     }
 private:
-    static int getTimeoutFd(__time_t tv_sec, long tv_nsec) {
+    static int getTimeoutFd(time_t tv_sec, long tv_nsec) {
         int fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
         if (fd < 0)
             syserr("timerfd_create");
@@ -86,11 +86,12 @@ public:
     }
 
     ~PollUtils() {
-        for (auto & i : pollData) {
-            if (close(i.fd)) {
-                syserr("Poll data close!");
-            }
-        }
+        //TODO
+//        for (auto & i : pollData) {
+//            if (close(i.fd)) {
+//                syserr("Poll data close!");
+//            }
+//        }
     }
 };
 

@@ -17,17 +17,18 @@
 #include "Game.h"
 #include "Packet.h"
 #include <iostream>
+
 enum IPaddressType {
     IPv4 = 0, IPv6 = 1
 };
 
-class ServerConnection {
+class Connection {
     int clientSock;
 
 public:
-    ServerConnection() = default;
+    Connection() = default;
 
-    ServerConnection(uint16_t portNum) {
+    Connection(uint16_t portNum) {
         int sockfd;
         struct addrinfo hints, *servinfo, *p = NULL;
 
@@ -74,7 +75,7 @@ public:
             syserr("Close error!");
     }
 
-    ~ServerConnection() {
+    ~Connection() {
         // doClose(); TODO chyba będę to robił dwa razy.
     }
 };
@@ -102,7 +103,7 @@ public:
     };
 
     // We do not compare session ID.
-    bool operator <(const Client& rhs) const {
+    bool operator<(const Client &rhs) const {
         if (ipType != rhs.ipType)
             return ipType < rhs.ipType;
 
@@ -114,12 +115,15 @@ public:
 
         return false;
     }
+
     bool operator==(const Client &rhs) const {
         return ipType == rhs.ipType && ipAddress == rhs.ipAddress && portNum == rhs.portNum;
     }
+
     void setSessionID(uint64_t sessionID) {
         this->sessionID = sessionID;
     }
+
     uint64_t getSessionID() const {
         return sessionID;
     }
@@ -157,6 +161,8 @@ class ClientManager {
     std::map<Client, int> countTicks;
 
 public:
+    ClientManager() = default;
+
     void addTicksAndCleanInactive() {
         auto it = countTicks.begin();
         while (it != countTicks.end()) {
@@ -182,16 +188,129 @@ public:
     size_t getClientsCount() const {
         return clients.size();
     }
-}
+};
+
+class ServerData {
+    uint32_t width, height;
+    int turiningSpeed;
+    uint16_t portNum;
+    uint32_t seed;
+    int roundsPerSec;
+public:
+    ServerData(uint32_t width, uint32_t height, int turiningSpeed, uint16_t portNum, uint32_t seed, int roundsPerSec)
+            : width(width), height(height), turiningSpeed(turiningSpeed), portNum(portNum), seed(seed),
+              roundsPerSec(roundsPerSec) {}
+
+    friend std::ostream &operator<<(std::ostream &os, const ServerData &data) {
+        os << "width: " << data.width << " height: " << data.height << " turiningSpeed: " << data.turiningSpeed
+           << " portNum: " << data.portNum << " seed: " << data.seed << " roundsPerSec: " << data.roundsPerSec;
+        return os;
+    }
+
+    uint32_t getWidth() const {
+        return width;
+    }
+
+    uint32_t getHeight() const {
+        return height;
+    }
+
+    int getTuriningSpeed() const {
+        return turiningSpeed;
+    }
+
+    [[nodiscard]] uint16_t getPortNum() const {
+        return portNum;
+    }
+
+    uint32_t getSeed() const {
+        return seed;
+    }
+
+    int getRoundsPerSec() const {
+        return roundsPerSec;
+    }
+};
+
+class ServerDataBuilder {
+    uint32_t width, height;
+    int turiningSpeed;
+    uint16_t portNum;
+    uint32_t seed;
+    int roundsPerSec;
+public:
+    ServerDataBuilder() {
+        width = Utils::DEFAULT_BOARD_WIDTH;
+        height = Utils::DEFAULT_BOARD_HEIGHT;
+        turiningSpeed = Utils::DEFAULT_TURINING_SPEED;
+        portNum = Utils::DEFAULT_PORT_NUM;
+        seed = time(NULL);
+        roundsPerSec = Utils::DEFAULT_ROUNDS_PER_SEC;
+    }
+
+    void parse(int argc, char **argv) {
+        char c;
+        while ((c = getopt(argc, argv, Utils::optstring)) != -1) {
+            size_t convertedSize = 0;
+            std::string argStr = optarg;
+            bool haveFound = false;
+            switch (c) {
+                case 'p': {
+                    portNum = std::stoi(argStr, &convertedSize);
+                    haveFound = true;
+                    break;
+                }
+                case 's': {
+                    seed = std::stoul(argStr, &convertedSize);
+                    haveFound = true;
+                    break;
+                }
+                case 't': {
+                    turiningSpeed = std::stoi(argStr, &convertedSize);
+                    haveFound = true;
+                    break;
+                }
+                case 'v':
+                    roundsPerSec = std::stoi(argStr, &convertedSize);
+                    haveFound = true;
+                    break;
+                case 'w':
+                    width = std::stoul(argStr, &convertedSize);
+                    haveFound = true;
+                    break;
+                case 'h':
+                    height = std::stoul(argStr, &convertedSize);
+                    haveFound = true;
+                    break;
+            }
+            if (haveFound) {
+                if (convertedSize != argStr.size())
+                    syserr("Argument parsing error!");
+            }
+        }
+    }
+
+    ServerData build() const {
+        return ServerData(width, height, turiningSpeed, portNum, seed, roundsPerSec);
+    }
+};
 
 class Server {
     inline static const std::string TAG = "Server: ";
 
     ClientManager manager;
     PollUtils pollUtils;
-    ServerConnection server;
-    Game board;
+    Connection connection;
+    Game game;
+    ServerData serverData;
 public:
+
+    Server(const ServerData &serverData) : serverData(serverData), game(serverData.getWidth(), serverData.getHeight(),
+                                                                        serverData.getTuriningSpeed()) {
+        connection = Connection(serverData.getPortNum());
+        pollUtils = PollUtils(connection.getSocket(), serverData.getRoundsPerSec());
+    }
+
     [[noreturn]] void start() {
         while (true) {
             int pollCount = pollUtils.doPoll();
@@ -204,7 +323,7 @@ public:
                 std::cout << "No DoPol events!" << std::endl;
             }
             if (pollUtils.hasPollinOccurred(PollUtils::TIMEOUT_ROUND)) {
-                std::cout << TAG<< "Timeout ROUND tick!" << std::endl;
+//                std::cout << TAG<< "Timeout ROUND tick!" << std::endl;
                 uint64_t exp;
                 ssize_t s = read(pollUtils.getDescriptor(PollUtils::TIMEOUT_ROUND), &exp, sizeof(uint64_t));
                 if (s != sizeof(uint64_t))
@@ -254,13 +373,6 @@ public:
                 std::cout << "Client count " << manager.getClientsCount() << std::endl;
             }
         }
-    }
-
-//    std::map<Client, Player> countTicks;
-    Server(uint16_t serverPortNum, int roundsPerSec) {
-        server = ServerConnection(serverPortNum);
-        pollUtils = PollUtils(server.getSocket(), roundsPerSec);
-
     }
 };
 

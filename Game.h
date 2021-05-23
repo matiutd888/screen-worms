@@ -62,6 +62,8 @@ class Worm {
 public:
     static const int N_DEGREES = 360;
 
+    Worm() = default; // TODO co z tym, potrzebne by para zadziałała.
+
     Worm(double x, double y, uint16_t direction, TurnDirection turn) : x(x),
                                                                        y(y),
                                                                        direction(direction),
@@ -88,9 +90,6 @@ public:
 };
 
 class Game {
-    static constexpr uint32_t DEFAULT_BOARD_WIDTH = 640;
-    static constexpr uint32_t DEFAULT_BOARD_HEIGHT = 480;
-
     int turningSpeed;
     uint32_t width, height;
     uint32_t gameID;
@@ -114,7 +113,7 @@ public:
     Game(uint32_t width, uint32_t height, int turningSpeed) : width(width), height(height), eventCount(0),
                                             pixels(width, std::vector<bool>(height, false)), turningSpeed(turningSpeed) {};
 
-    std::vector<Record> startNewGame(const std::vector<Player> &gamePlayers, Random &random) {
+    std::vector<Record> startNewGame(std::vector<Player> &gamePlayers, Random &random) {
         std::sort(gamePlayers.begin(), gamePlayers.end());
         std::vector<Record> records;
         gameID = random.generate();
@@ -133,7 +132,7 @@ public:
                         Record(eventCount++, std::make_shared<PixelEventData>(PixelEventData(i, x, y))));
                 uint16_t direction = random.generate() % Worm::N_DEGREES;
                 TurnDirection turnDirection = gamePlayers[i].getEnteredDirection();
-                activePlayers[gamePlayers[i]] = {i, Worm(x, y, direction, turnDirection)};
+                activePlayers[gamePlayers[i]] = std::pair<uint32_t, Worm>(i, Worm(x, y, direction, turnDirection));
                 pixels[x][y] = true;
             }
         }

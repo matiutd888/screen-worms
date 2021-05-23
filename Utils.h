@@ -14,10 +14,13 @@ class Utils {
 public:
     static constexpr port_num_t DEFAULT_PORT_NUM = 2021;
     static inline const std::string DEFAULT_GUI_SERVER_NAME = "localhost";
-    static inline const std::string optstring = "p:s:t:v:w:h:";
+    static inline const char *const optstring = "p:s:t:v:w:h:";
 
     static constexpr int TIMEOUT_CLIENTS_SEC = 2;
     static constexpr int DEFAULT_ROUNDS_PER_SEC = 50;
+    static constexpr uint32_t DEFAULT_BOARD_WIDTH = 640;
+    static constexpr uint32_t DEFAULT_BOARD_HEIGHT = 480;
+    static constexpr int DEFAULT_TURINING_SPEED = 6;
 
     static constexpr int NUMBER_OF_TICKS = 2;
 };
