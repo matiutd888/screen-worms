@@ -5,6 +5,8 @@
 #include "Connection.h"
 #include "Utils.h"
 #include "err.h"
+#include "DataBuilders.h"
+#include "Server.h"
 
 //./screen-worms-server [-p n] [-s n] [-t n] [-v n] [-w n] [-h n]
 //

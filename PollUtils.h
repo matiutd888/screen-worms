@@ -11,38 +11,10 @@
 #include "Utils.h"
 
 class PollUtils {
-    static constexpr int N_DESC = 3;
-    static constexpr int TIMEOUT_MS = 2000;
-    struct pollfd pollData[N_DESC];
-public:
-    static constexpr int MESSAGE_CLIENT = 0;
-    static constexpr int TIMEOUT_CLIENT = 1;
-    static constexpr int TIMEOUT_ROUND = 2;
+protected:
+    static constexpr int MAX_DESC = 10;
+    struct pollfd pollData[MAX_DESC];
 
-    PollUtils() = default; // A bad practise of sorts
-
-    PollUtils(int socket, int roundsPerSec) {
-        pollData[MESSAGE_CLIENT].fd = socket;
-        pollData[MESSAGE_CLIENT].events = POLLIN;
-
-        if (Utils::NUMBER_OF_TICKS > Utils::TIMEOUT_CLIENTS_SEC) {
-            long nanoTimeoutClients = Utils::TIMEOUT_CLIENTS_SEC * 1e9 / Utils::NUMBER_OF_TICKS;
-            pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(0, nanoTimeoutClients);
-        } else {
-            pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(Utils::TIMEOUT_CLIENTS_SEC / Utils::NUMBER_OF_TICKS, 0);
-        }
-
-        pollData[TIMEOUT_CLIENT].events = POLLIN;
-
-        if (roundsPerSec > 1) {
-            long nanoTimeoutRounds = 1e9 / roundsPerSec;
-            pollData[TIMEOUT_ROUND].fd = getTimeoutFd(0, nanoTimeoutRounds);
-        } else {
-            pollData[TIMEOUT_ROUND].fd = getTimeoutFd(1, 0);
-        }
-        pollData[TIMEOUT_ROUND].events = POLLIN;
-    }
-private:
     static int getTimeoutFd(time_t tv_sec, long tv_nsec) {
         int fd = timerfd_create(CLOCK_MONOTONIC, TFD_NONBLOCK);
         if (fd < 0)
@@ -59,17 +31,23 @@ private:
         return fd;
     }
 
+private:
+    int numberOfDescriptors;
+    static constexpr int TIMEOUT_MS = 2000;
 public:
     int doPoll() {
-        return poll(pollData, N_DESC, TIMEOUT_MS);
+        return poll(pollData, numberOfDescriptors, TIMEOUT_MS);
     }
 
     bool hasPollinOccurred(int index) {
+        if (index >= numberOfDescriptors) {
+            syserr("invalid Poll index!");
+        }
         return pollData[index].revents & POLLIN;
     }
 
     bool checkError() {
-        for(int i = 0; i < N_DESC; i++) {
+        for (int i = 0; i < numberOfDescriptors; i++) {
             if (pollData[i].revents & POLLERR) {
                 return true;
             }
@@ -77,12 +55,15 @@ public:
         return false;
     }
 
-    int getNumberOfExpirations(int index) {
-        return 0;
+    int getDescriptor(int index) {
+        if (index >= numberOfDescriptors) {
+            syserr("invalid Poll index!");
+        }
+        return pollData[index].fd;
     }
 
-    int getDescriptor(int index) {
-        return pollData[index].fd;
+    int getNumberOfExpirations(int index) {
+        return 0;
     }
 
     ~PollUtils() {
@@ -93,6 +74,71 @@ public:
 //            }
 //        }
     }
+
+protected:
+    PollUtils(int numberOfDescriptors) : numberOfDescriptors(numberOfDescriptors) {}
+};
+
+class PollServer : public PollUtils {
+    static constexpr int N_DESC = 3;
+public:
+    static constexpr int MESSAGE_CLIENT = 0;
+    static constexpr int TIMEOUT_CLIENT = 1;
+    static constexpr int TIMEOUT_ROUND = 2;
+
+    PollServer() : PollUtils(N_DESC) {} // A bad practise of sorts
+
+    PollServer(int socket, int roundsPerSec) : PollUtils(N_DESC) {
+        pollData[MESSAGE_CLIENT].fd = socket;
+        pollData[MESSAGE_CLIENT].events = POLLIN;
+
+        if (Utils::NUMBER_OF_TICKS > Utils::TIMEOUT_CLIENTS_SEC) {
+            long nanoTimeoutClients = Utils::TIMEOUT_CLIENTS_SEC * 1e9 / Utils::NUMBER_OF_TICKS;
+            pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(0, nanoTimeoutClients);
+        } else {
+            pollData[TIMEOUT_CLIENT].fd = getTimeoutFd(Utils::TIMEOUT_CLIENTS_SEC / Utils::NUMBER_OF_TICKS, 0);
+        }
+
+        pollData[TIMEOUT_CLIENT].events = POLLIN;
+
+        if (roundsPerSec > 1) {
+            long nanoTimeoutRounds = Utils::SEC_TO_NANOSEC / roundsPerSec;
+            pollData[TIMEOUT_ROUND].fd = getTimeoutFd(0, nanoTimeoutRounds);
+        } else {
+            pollData[TIMEOUT_ROUND].fd = getTimeoutFd(1, 0);
+        }
+        pollData[TIMEOUT_ROUND].events = POLLIN;
+    }
+};
+
+class PollClient : public PollUtils {
+    static constexpr int N_DESC = 2;
+public:
+    static constexpr int MESSAGE_SERVER = 0;
+    static constexpr int INTERVAL_SENDMESSAGE = 1;
+    static constexpr int MESSAGE_GUI = 2;
+
+    PollClient() : PollUtils(N_DESC) {};
+
+    PollClient(int serverfd, int guifd) : PollUtils(N_DESC) {
+        pollData[MESSAGE_SERVER].fd = serverfd;
+        pollData[MESSAGE_SERVER].events = POLLIN;
+//        pollData[MESSAGE_GUI].fd = guifd;
+//        pollData[MESSAGE_GUI].events = POLLIN;
+
+        long nano = milisecToNano(Utils::INTERVAL_CLIENT_MESSAGE_MS);
+        if (nano >= Utils::SEC_TO_NANOSEC) {
+            syserr("PollClient: Sending to slow!");
+        }
+        pollData[INTERVAL_SENDMESSAGE].fd = getTimeoutFd(0, nano);
+        pollData[INTERVAL_SENDMESSAGE].events = POLLIN;
+    }
+
+private:
+    long milisecToNano(long milisec) {
+        return milisec * 1e6;
+    }
+
 };
 
 

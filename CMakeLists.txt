@@ -13,22 +13,26 @@ macro (add_executable _name)
         target_link_libraries(${_name} err)
     endif()
 endmacro()
-
-add_executable(echo-server examples/echo-server-udp.c)
-add_executable(test examples/test.cpp)
-add_executable(echo-client examples/echo-client-udp.c)
-add_executable(beej-listener examples/listener.c)
-add_executable(beej-talker examples/talker.c)
-add_executable(beej-poll-erver examples/poll_server_beej.c)
-
 add_library(err err.cpp err.h)
+#
+#add_executable(echo-server examples/echo-server-udp.c)
+#add_executable(test examples/test.cpp)
+#add_executable(echo-client examples/echo-client-udp.c)
+#add_executable(beej-listener examples/listener.c)
+#add_executable(beej-talker examples/talker.c)
+#add_executable(beej-poll-erver examples/poll_server_beej.c)
+
 add_library(Utils Utils.cpp Utils.h)
 add_library(Random Random.cpp Random.h)
 add_library(Packet Packet.cpp Packet.h)
 add_library(Board Game.cpp Game.h)
 add_library(Connection Connection.cpp Connection.h)
 add_library(Messages Messages.cpp Messages.h)
-add_executable(serwer main.cpp)
+add_library(Server Server.cpp Server.h)
+add_library(DataBuilders DataBuilders.cpp DataBuilders.h)
+add_executable(serwer serwer.cpp)
+
+add_executable(client client.cpp)
 
 
 
