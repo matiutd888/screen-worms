@@ -120,15 +120,15 @@ public:
         ClientMessage clientMessage;
 
         debug_out_1 << "Decoding Client Message" << std::endl;
-//        if (packet.getRemainingSize() < minimumMessageSize()) {
-//            syserr("Packet to small to decode client!");
-//        }
+        if (packet.getRemainingSize() < minimumMessageSize()) {
+            throw Packet::PacketToSmallException();
+        }
         read64FromPacket(packet, clientMessage.sessionID);
         debug_out_1 << "Read session ID = " << clientMessage.sessionID << std::endl;
         packet.readData(&clientMessage.turnDirection, sizeof(turnDirection));
         debug_out_1 << "READ turn direction = " << uint64_t(clientMessage.turnDirection) << std::endl;
         if (clientMessage.turnDirection > Utils::TURN_MAX_VALUE)
-            throw Utils::ParseException();
+            throw Packet::FatalDecodingException();
 
         read32FromPacket(packet, clientMessage.nextExpectedEventNo);
         debug_out_1 << " READ next expected event no = " << clientMessage.nextExpectedEventNo << std::endl;
@@ -136,13 +136,13 @@ public:
         size_t remainingSize = packet.getRemainingSize();
         if (remainingSize > MAX_PLAYER_NAME_LENGTH) {
             std::cerr << "ERROR: Remaining size  > MAX_PLAYER_NAME_LENGTH " << std::endl;
-            throw Utils::ParseException();
+            throw Packet::FatalDecodingException();
         }
         packet.readData(clientMessage.playerName, remainingSize);
         debug_out_1 << "READ player name = " << std::string(clientMessage.playerName) << std::endl;
         clientMessage.playerNameSize = remainingSize;
         if (!checkIfNameOK(clientMessage.playerName, clientMessage.playerNameSize))
-            throw Utils::ParseException();
+            throw Packet::FatalDecodingException();
         return clientMessage;
     };
 
@@ -153,11 +153,11 @@ public:
         return os;
     }
 
-    const char *getPlayerName() const {
+    [[nodiscard]] const char *getPlayerName() const {
         return playerName;
     }
 
-    uint32_t getNextExpectedEventNo() const {
+    [[nodiscard]] uint32_t getNextExpectedEventNo() const {
         return nextExpectedEventNo;
     }
 
@@ -184,7 +184,7 @@ protected:
 public:
     EventData() = default;
 
-    virtual void encode(WritePacket &packet) = 0;
+    virtual void encode(WritePacket &packet) const = 0;
 
     virtual void decode() = 0;
 
@@ -217,9 +217,9 @@ public:
         return sizeof(x) + sizeof(y) + playerNameSize + EventData::getSize();
     }
 
-    void encode(WritePacket &packet) override {
+    void encode(WritePacket &packet) const override {
         if (getSize() > packet.getRemainingSize())
-            throw Utils::ParseException();
+            throw Packet::PacketToSmallException();
         uint8_t typeNetwork = type;
         packet.write(&typeNetwork, sizeof(typeNetwork));
 
@@ -245,9 +245,9 @@ public:
         return sizeof(playerNumber) + sizeof(x) + sizeof(y) + EventData::getSize();
     }
 
-    void encode(WritePacket &packet) override {
+    void encode(WritePacket &packet) const override {
         if (getSize() > packet.getRemainingSize())
-            throw Utils::ParseException();
+            throw Packet::PacketToSmallException();
         uint8_t typeNetwork = type;
         packet.write(&typeNetwork, sizeof(typeNetwork));
 
@@ -266,9 +266,9 @@ public:
         type = ServerEventType::PLAYER_ELIMINATED;
     }
 
-    void encode(WritePacket &packet) override {
+    void encode(WritePacket &packet) const override {
         if (getSize() > packet.getRemainingSize())
-            throw Utils::ParseException();
+            throw Packet::PacketToSmallException();
         uint8_t typeNetwork = type;
         packet.write(&typeNetwork, sizeof(typeNetwork));
         packet.write(&playerNumber, sizeof(playerNumber));
@@ -287,9 +287,9 @@ public:
         type = ServerEventType::GAME_OVER;
     }
 
-    void encode(WritePacket &packet) override {
+    void encode(WritePacket &packet) const override {
         if (getSize() > packet.getRemainingSize())
-            throw Utils::ParseException();
+            throw Packet::PacketToSmallException();
         uint8_t typeNetwork = type;
         packet.write(&typeNetwork, sizeof(typeNetwork));
     }
@@ -301,7 +301,7 @@ public:
 
 class Record {
     uint32_t eventNo;
-    uint32_t crc32;
+    using crc32_t = uint32_t;
     uint32_t len;
     std::shared_ptr<EventData> eventData;
 public:
@@ -311,20 +311,20 @@ public:
         this->eventNo = eventNo;
     }
 
-    size_t getSize() {
-        return len + sizeof(len) + sizeof(crc32);
+    size_t getSize() const {
+        return len + sizeof(len) + sizeof(crc32_t); // Len already has size of eventData.
     }
 
-    void encode(WritePacket &packet) {
-        if (getSize() < packet.getRemainingSize())
-            throw Utils::ParseException();
-        uint32_t sizeNoCRC32 = getSize() - sizeof(crc32);
+    void encode(WritePacket &packet) const {
+        if (getSize() > packet.getRemainingSize())
+            throw Packet::PacketToSmallException();
+        uint32_t sizeNoCRC32 = getSize() - sizeof(crc32_t);
         size_t initialOffset = packet.getOffset();
         write32ToPacket(packet, len);
         write32ToPacket(packet, eventNo);
         eventData->encode(packet);
-        crc32 = Message::genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
-        write32ToPacket(packet, crc32);
+        uint32_t m_crc32 = Message::genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
+        write32ToPacket(packet, m_crc32);
     }
 
     void decode() {
@@ -333,8 +333,12 @@ public:
 };
 
 class ServerMessage {
-    uint32_t game_id;
-    std::vector<Record> events;
+public:
+    static void startServerMessage(WritePacket &packet, uint32_t gameId) {
+        if (packet.getRemainingSize() < sizeof(gameId))
+            throw Packet::PacketToSmallException();
+        write32ToPacket(packet, gameId);
+    }
 };
 
 #endif //ZADANIE_2_MESSAGES_H

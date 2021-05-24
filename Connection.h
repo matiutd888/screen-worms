@@ -175,13 +175,8 @@ class Client {
     uint16_t portNum;
     std::string ipAddress;
     IPaddressType ipType;
-    uint64_t sessionID;
     struct sockaddr_storage sockaddrStorage;
 public:
-    Client(const struct sockaddr_storage &s, uint64_t sessionID) : Client(s) {
-        this->sessionID = sessionID;
-    };
-
     // We do not compare session ID.
     bool operator<(const Client &rhs) const {
         if (ipType != rhs.ipType)
@@ -199,10 +194,14 @@ public:
     bool operator==(const Client &rhs) const {
         return ipType == rhs.ipType && ipAddress == rhs.ipAddress && portNum == rhs.portNum;
     }
-
-    uint64_t getSessionID() const {
-        return sessionID;
-    }
+//
+//    uint64_t getSessionID() const {
+//        return sessionID;
+//    }
+//
+//    void setSessionId(uint64_t sessionId) {
+//        sessionID = sessionId;
+//    }
 
     friend std::ostream &operator<<(std::ostream &os, const Client &client) {
         os << " ipAddress: " << client.ipAddress  << "portNum: " << client.portNum;

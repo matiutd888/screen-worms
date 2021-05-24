@@ -16,6 +16,25 @@ protected:
     static constexpr int MAX_SIZE = 550;
     char buffer[MAX_SIZE];
 public:
+    class PacketToSmallException : std::exception {
+        const char * what() const noexcept override {
+            std::cerr << "PACKET TO SMALL TO PERFORM READ / WRITE " << std::endl;
+        }
+    };
+
+    class FatalEncodingException : std::exception {
+    public:
+        const char *what() const noexcept override {
+            std::cerr << "Parse exception occured!" << std::endl;
+        }
+    };
+
+    class FatalDecodingException : std::exception {
+    public:
+        const char *what() const noexcept override {
+            std::cerr << "Parse exception occured!" << std::endl;
+        }
+    };
     static size_t getMaxSize() {
         return MAX_SIZE;
     }
@@ -57,7 +76,7 @@ public:
     // Throws @ParseException
     void write(const void *data, size_t dataSize) {
         if (offset + dataSize >= MAX_SIZE)
-            throw Utils::ParseException();
+            throw Packet::FatalEncodingException();
         std::cout << TAG << "Writing " << dataSize << " bytes to packet of size " << getRemainingSize() << " and offset " << offset << std::endl;
 
         memcpy(buffer + offset, data, dataSize);
@@ -96,7 +115,7 @@ public:
     void readData(void *dst, size_t dataSize) {
         std::cout << TAG << "Reading " << dataSize << " bytes from packet of size " << size << " and offset " << offset << std::endl;
         if (getRemainingSize() < dataSize)
-            throw Utils::ParseException();
+            throw Packet::FatalDecodingException();
         memcpy(dst, buffer + offset, dataSize);
         offset += dataSize;
     }

@@ -31,20 +31,6 @@ namespace Utils {
     static constexpr uint16_t DEFAULT_GUI_PORT_NUM = 20210;
     static constexpr int GAME_CLIENTS_LIMIT = 25;
     static constexpr int TURN_MAX_VALUE = 2;
-
-    class ParseException : std::exception {
-    public:
-        const char *what() const noexcept override {
-            std::cerr << "Parse exception occured!" << std::endl;
-        }
-    };
-
-    class ReadException : std::exception {
-    public:
-        const char *what() const noexcept override {
-            std::cerr << "Parse exception occured!" << std::endl;
-        }
-    };
 };
 
 
