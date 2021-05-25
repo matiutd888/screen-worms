@@ -52,7 +52,7 @@ public:
         memset(&hints, 0, sizeof hints);
         hints.ai_family = AF_UNSPEC; // set to AF_INET to use IPv4
         hints.ai_socktype = SOCK_DGRAM;
-        hints.ai_flags = AI_PASSIVE; // use my IP
+//        hints.ai_flags = AI_PASSIVE; // use my IP
 
         if (getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &servinfo) != 0) {
             syserr("getaddrinfo");
@@ -98,7 +98,7 @@ public:
         if ((rv = getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &servinfo)) != 0) {
             syserr("getaddrinfo");
         }
-
+        debug_out_1 << "UDP: Trying to loop through IPS" << std::endl;
         // loop through all the results and make a socket
         for(p = servinfo; p != NULL; p = p->ai_next) {
             if ((sockfd = socket(p->ai_family, p->ai_socktype,
@@ -136,7 +136,7 @@ public:
         if (getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &servinfo) != 0) {
             syserr("getaddrinfo");
         }
-
+        debug_out_1 << "TCP: Trying to loop through IPS" << std::endl;
         // loop through all the results and connect to the first we can
         for (p = servinfo; p != NULL; p = p->ai_next) {
             if ((sockfd = socket(p->ai_family, p->ai_socktype,
