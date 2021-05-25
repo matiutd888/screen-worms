@@ -21,6 +21,9 @@
 #include "Connection.h"
 #include "DataBuilders.h"
 
+// TODO zastanowić się nad tym Round Robin
+// Wymagałoby to tak naprawdę tylko iteratora...
+// Myślę że do zrobienia, ale potem.
 class ClientManager {
     using clientValue_t = std::pair<Player, int>;
     std::map<Client, clientValue_t> clients;
@@ -177,7 +180,8 @@ public:
         if (!clientExists(newClient)) {
             if (clients.size() + 1 > Utils::GAME_CLIENTS_LIMIT)
                 return;
-
+            if (!isNameUnique(newMsg.getPlayerName(), newClient))
+                return;
             addClient(newClient, newMsg);
             return;
         }
@@ -204,16 +208,12 @@ public:
         }
     }
 
-    bool clientExists(const Client &client) const {
+    [[nodiscard]] bool clientExists(const Client &client) const {
         return clients.find(client) != clients.end();
     }
 
-    bool hasMessages() const {
+    [[nodiscard]] bool hasMessages() const {
         return !packetsToSend.empty();
-    }
-
-    [[nodiscard]] size_t getClientsCount() const {
-        return clients.size();
     }
 
     auto startGame() {
