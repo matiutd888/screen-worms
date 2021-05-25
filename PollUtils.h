@@ -128,7 +128,7 @@ public:
 };
 
 class PollClient : public PollUtils {
-    static constexpr int N_DESC = 2;
+    static constexpr int N_DESC = 3;
 public:
     static constexpr int MESSAGE_SERVER = 0;
     static constexpr int INTERVAL_SENDMESSAGE = 1;
@@ -139,8 +139,8 @@ public:
     PollClient(int serverfd, int guifd) : PollUtils(N_DESC) {
         pollData[MESSAGE_SERVER].fd = serverfd;
         pollData[MESSAGE_SERVER].events = POLLIN;
-//        pollData[MESSAGE_GUI].fd = guifd;
-//        pollData[MESSAGE_GUI].events = POLLIN;
+        pollData[MESSAGE_GUI].fd = guifd;
+        pollData[MESSAGE_GUI].events = POLLIN;
 
         long nano = milisecToNano(Utils::INTERVAL_CLIENT_MESSAGE_MS);
         if (nano >= Utils::SEC_TO_NANOSEC) {

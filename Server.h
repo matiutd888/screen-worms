@@ -36,19 +36,20 @@ class ClientManager {
     static constexpr int TICKS_INDEX = 1;
     static constexpr int NEXT_EXPECTED_EVENT_NO = 2;
  //   std::queue<WritePacket> packetsToSend;
+    inline static const std::string TAG = "Client Manager: ";
     std::queue<std::pair<Client, WritePacket>> packetsToSend;
 public:
     ClientManager(uint32_t width, uint32_t height, int turningSpeed, uint32_t seed) : game(width, height, turningSpeed),
                                                                        countReadyPlayers(0), countNotObservers(0),
                                                                                       random(seed) {};
 
-    std::vector<Record> getRecords(uint32_t next_expected_event_no) const {
+    [[nodiscard]] std::vector<Record> getRecords(uint32_t next_expected_event_no) const {
         if (next_expected_event_no >= gameRecords.size())
             return std::vector<Record>();
         return std::vector<Record>(gameRecords.begin() + next_expected_event_no, gameRecords.end());
     }
 
-    std::vector<WritePacket> constructPackets(const std::vector<Record> &records) const {
+    [[nodiscard]] std::vector<WritePacket> constructPackets(const std::vector<Record> &records) const {
         size_t it = 0;
         std::vector<WritePacket> packets;
         while (it < records.size()) {
@@ -225,6 +226,7 @@ public:
                 gamePlayers.push_back(clientVal.first);
             }
         }
+        debug_out_0 << TAG << "Starting new game with " << countReadyPlayers << " ready players and " << clients.size() - countNotObservers << " observers\n";
         std::vector<Record> records = game.startNewGame(gamePlayers, random);
         gameRecords.insert(gameRecords.end(), records.begin(), records.end());
         return records;
@@ -235,15 +237,18 @@ public:
         packetsToSend.pop();
         return top;
     }
-
+    void endGame() {
+        debug_out_0 << TAG << " Ending game! " << std::endl;
+        for (auto &it : clients) {
+            it.second.first.setReady(false);
+        }
+        gameRecords.clear();
+        countReadyPlayers = 0;
+    }
     void performRound() {
         pushPacketsForAll(constructPackets(game.doRound()));
         if (!game.isGameNow()) {
-            for (auto &it : clients) {
-                it.second.first.setReady(false);
-            }
-            gameRecords.clear();
-            countReadyPlayers = 0;
+            endGame();
         }
     }
 };
@@ -300,7 +305,6 @@ public:
                                            pollServer(clientSocket.getSocket(), serverData.getRoundsPerSec()) {}
 
     [[noreturn]] void start() {
-        Message::makeCRCtable();
         while (true) {
             int pollCount = pollServer.doPoll();
             if (pollCount < 0) {
@@ -348,8 +352,10 @@ public:
                 auto packetToSend = manager.packetsQueuePop();
                 sendPacketToClient(packetToSend.first, packetToSend.second);
                 pollServer.removePolloutFromEvents(PollServer::MESSAGE_CLIENT);
+                debug_out_1 << "Removing pollout " << std::endl;
             }
             if (manager.hasMessages()) {
+                debug_out_1 << "Adding POLLOUT" << std::endl;
                 pollServer.addPolloutToEvents(PollServer::MESSAGE_CLIENT);
             }
         }

@@ -181,7 +181,7 @@ public:
         auto newGameEvent = std::make_shared<NewGameData>(NewGameData(width, height,generateNamesVector(gamePlayers)));
         records.emplace_back(Record(eventCount++, newGameEvent));
         for (size_t i = 0; i < gamePlayers.size(); i++) {
-
+            std::cout << "Player " << i << gamePlayers[i] << std::endl;
             double x = (random.generate() % width) + 0.5;
             double y = (random.generate() % height) + 0.5;
             if (isDead(x, y)) {

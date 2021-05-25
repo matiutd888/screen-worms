@@ -17,6 +17,7 @@
 #include "Game.h"
 #include "Packet.h"
 #include <iostream>
+#include <netinet/tcp.h>
 
 enum IPaddressType {
     IPv4 = 0, IPv6 = 1
@@ -144,8 +145,21 @@ public:
                 continue;
             }
 
+//            // https://stackoverflow.com/questions/31997648/where-do-i-set-tcp-nodelay-in-this-c-tcp-client
+//            int yes = 1;
+//            int result = setsockopt(sockfd,
+//                                    IPPROTO_TCP,
+//                                    TCP_NODELAY,
+//                                    (char *) &yes,
+//                                    sizeof(int));
+//            // 1 - on, 0 - off
+//            if (result < 0) {
+//                perror("client: set sock opt");
+//                continue;
+//
+//            }
             if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-                perror("client: connect");
+                perror("client: connect tcp");
                 close(sockfd);
                 continue;
             }

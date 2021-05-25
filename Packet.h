@@ -77,7 +77,7 @@ public:
     void write(const void *data, size_t dataSize) {
         if (offset + dataSize >= MAX_SIZE)
             throw Packet::FatalEncodingException();
-        std::cout << TAG << "Writing " << dataSize << " bytes to packet of size " << getRemainingSize() << " and offset " << offset << std::endl;
+//        std::cout << TAG << "Writing " << dataSize << " bytes to packet of size " << getRemainingSize() << " and offset " << offset << std::endl;
 
         memcpy(buffer + offset, data, dataSize);
         offset += dataSize;
@@ -113,7 +113,7 @@ public:
     }
 
     void readData(void *dst, size_t dataSize) {
-        std::cout << TAG << "Reading " << dataSize << " bytes from packet of size " << size << " and offset " << offset << std::endl;
+//        std::cout << TAG << "Reading " << dataSize << " bytes from packet of size " << size << " and offset " << offset << std::endl;
         if (getRemainingSize() < dataSize)
             throw Packet::FatalDecodingException();
         memcpy(dst, buffer + offset, dataSize);
