@@ -61,6 +61,7 @@ class ClientDataBuilder {
     uint16_t serverPortNum;
     std::string guiAddress;
     uint16_t guiPortNum;
+    uint32_t next_expected_event_no;
 public:
     ClientDataBuilder() {
         serverAddress = "";
@@ -141,7 +142,7 @@ public:
                 std::cout << "No DoPol events!" << std::endl;
             }
 
-            if  (pollClient.hasPollinOccurred(PollClient::MESSAGE_SERVER)) {
+            if (pollClient.hasPollinOccurred(PollClient::MESSAGE_SERVER)) {
                 std::cout << "Message server!" << std::endl;
             }
             if (pollClient.hasPollinOccurred(PollClient::INTERVAL_SENDMESSAGE)) {
@@ -150,7 +151,8 @@ public:
                 std::cout << clientMessage << std::endl;
                 WritePacket writePacket;
                 clientMessage.encode(writePacket);
-                sendto(sock.getSocket(), writePacket.getBufferConst(), writePacket.getOffset(), 0, sock.getAddrInfo().ai_addr, sock.getAddrInfo().ai_addrlen);
+                sendto(sock.getSocket(), writePacket.getBufferConst(), writePacket.getOffset(), 0,
+                       sock.getAddrInfo().ai_addr, sock.getAddrInfo().ai_addrlen);
             }
         }
     }

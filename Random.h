@@ -8,7 +8,7 @@
 #endif //ZADANIE_2_RANDOM_H
 
 class Random {
-    static uint32_t r;
+    uint32_t r;
     static constexpr uint32_t MULTIPLY_CONST = 279410273;
     static constexpr uint32_t MODULO_CONST = 4294967291;
 public:

@@ -23,14 +23,19 @@ class Player {
     std::string playerName;
     TurnDirection enteredDirection;
     bool isReady;
-    // TODO zastanwoić się gdzie trzymać nextExcpectedeventNo
+    uint64_t sessionID;
 public:
-    Player(const std::string &playerName, uint32_t number, TurnDirection direction) : playerName(playerName),
-                                                                                      enteredDirection(direction) {
+    Player(const std::string &playerName, TurnDirection direction, uint64_t sessionID) : playerName(playerName),
+                                                                                      enteredDirection(direction),
+                                                                                      sessionID(sessionID){
         if (direction != TurnDirection::STRAIGHT)
             isReady = true;
         else
             isReady = false;
+    }
+
+    uint64_t getSessionId() const {
+        return sessionID;
     }
 
     friend std::ostream &operator<<(std::ostream &os, const Player &player) {
@@ -44,6 +49,9 @@ public:
 
     void setDirection(TurnDirection direction) {
         enteredDirection = direction;
+        if (direction != TurnDirection::STRAIGHT) {
+            isReady = true;
+        }
     }
 
     [[nodiscard]] TurnDirection getEnteredDirection() const {
@@ -55,7 +63,7 @@ public:
     }
 
     bool isPlayerReady() const {
-        return isReady;
+        return isObserver() && isReady;
     }
 
     bool operator<(const Player &rhs) const {
@@ -71,7 +79,6 @@ public:
         return playerName;
     }
     Player() = default; // TODO naprawić to
-
 };
 
 class Worm {
@@ -111,6 +118,10 @@ public:
 
     std::pair<uint32_t, uint32_t> getPixel() {
         return {x, y};
+    }
+
+    void setRecentTurn(TurnDirection recentTurn) {
+        Worm::recentTurn = recentTurn;
     }
 
 };
@@ -163,7 +174,6 @@ public:
     std::vector<Record> startNewGame(std::vector<Player> &gamePlayers, Random &random) {
         clearBoard();
         isGameRightNow = true;
-
         std::sort(gamePlayers.begin(), gamePlayers.end());
         std::vector<Record> records;
         gameID = random.generate();
@@ -232,8 +242,27 @@ public:
         return records;
     }
 
-    bool hasGameEnded() const {
-        return !isGameRightNow;
+    bool isGameNow() const {
+        return isGameRightNow;
+    }
+
+    void updatePlayer(const Player &player) {
+        auto it = activePlayers.find(player);
+        if (it == activePlayers.end()) {
+            debug_out_1 << "Player " << player << " not found!" << std::endl;
+            return;
+        }
+        const Player &p = it->first;
+        if (p.getSessionId() != player.getSessionId()) {
+            debug_out_1 << "Player " << player << " differs with session ID!" << std::endl;
+            return;
+        }
+        Worm &worm = it->second.second;
+        worm.setRecentTurn(player.getEnteredDirection());
+    }
+
+    uint32_t getGameId() const {
+        return gameID;
     }
 };
 
