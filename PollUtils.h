@@ -46,6 +46,14 @@ public:
         return pollData[index].revents & POLLIN;
     }
 
+    bool hasPolloutOccurred(int index) {
+        if (index >= numberOfDescriptors) {
+            syserr("invalid Poll index!");
+        }
+        return pollData[index].revents & POLLOUT;
+    }
+
+
     bool checkError() {
         for (int i = 0; i < numberOfDescriptors; i++) {
             if (pollData[i].revents & POLLERR) {
@@ -55,7 +63,7 @@ public:
         return false;
     }
 
-    int getDescriptor(int index) {
+    int getDescriptor(int index) const {
         if (index >= numberOfDescriptors) {
             syserr("invalid Poll index!");
         }
@@ -109,6 +117,14 @@ public:
         }
         pollData[TIMEOUT_ROUND].events = POLLIN;
     }
+
+    void addPolloutToEvents(int index) {
+        pollData[index].events |= POLLOUT;
+    }
+
+    void removePolloutFromEvents(int index) {
+        pollData[index].events = POLLIN;
+    }
 };
 
 class PollClient : public PollUtils {
@@ -133,6 +149,8 @@ public:
         pollData[INTERVAL_SENDMESSAGE].fd = getTimeoutFd(0, nano);
         pollData[INTERVAL_SENDMESSAGE].events = POLLIN;
     }
+
+
 
 private:
     long milisecToNano(long milisec) {

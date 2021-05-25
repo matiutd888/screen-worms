@@ -6,6 +6,7 @@
 #define ZADANIE_2_MESSAGES_H
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 #include <string>
 #include <memory>
@@ -43,9 +44,17 @@ inline void write64ToPacket(WritePacket &packet, uint64_t x) {
     uint64_t networkx = htobe64(x);
     packet.write(&networkx, sizeof(networkx));
 }
+inline bool charOK(char c) {
+    if (c < 33 || c > 126)
+        return false;
+    return true;
+}
 
 class Message {
-    static uint32_t crcTable[256];
+    static uint32_t* crcTable() {
+        static uint32_t mTable[256];
+        return mTable;
+    }
 public:
     // https://stackoverflow.com/questions/26049150/calculate-a-32-bit-crc-lookup-table-in-c-c
     static void makeCRCtable() {
@@ -61,15 +70,15 @@ public:
                 else
                     remainder = (remainder >> 1);
             }
-            crcTable[(size_t) b] = remainder;
+            crcTable()[(size_t) b] = remainder;
         } while (0 != ++b);
     }
 
-    static uint32_t genCRC(const char *buffer, size_t bufsize) {
+    uint32_t genCRC(const char *buffer, size_t bufsize) {
         uint32_t crc = 0xffffffff;
         size_t i;
         for (i = 0; i < bufsize; i++)
-            crc = crcTable[*buffer++ ^ (crc & 0xff)] ^ (crc >> 8);
+            crc = crcTable()[*buffer++ ^ (crc & 0xff)] ^ (crc >> 8);
         return (~crc);
     }
 
@@ -88,9 +97,8 @@ class ClientMessage {
     ClientMessage() = default;
     static bool checkIfNameOK(const char *name, size_t nameSize) {
         for (size_t i = 0; i < nameSize; i++) {
-            if (name[i] < 33 || name[i] > 126) {
+            if (!charOK(name[i]))
                 return false;
-            }
         }
         return true;
     }
@@ -186,8 +194,6 @@ public:
 
     virtual void encode(WritePacket &packet) const = 0;
 
-    virtual void decode() = 0;
-
     [[nodiscard]] virtual size_t getSize() const {
         return 1; // Typ has only one byte.
     };
@@ -203,6 +209,7 @@ class NewGameData : public EventData {
     uint32_t x, y;
     std::vector<std::string> playerNames;
     size_t playerNameSize;
+    NewGameData() {type = ServerEventType::NEW_GAME;}
 public:
     NewGameData(uint32_t x, uint32_t y, const std::vector<std::string> &playerNames) : x(x), y(y),
                                                                                        playerNames(playerNames) {
@@ -230,12 +237,44 @@ public:
         }
     }
 
-    void decode() override {}
+    static std::shared_ptr<EventData> decode(ReadPacket &packet) {
+        NewGameData newGameData;
+        read32FromPacket(packet, newGameData.x);
+        read32FromPacket(packet, newGameData.y);
+        std::string playersBuff;
+        playersBuff.resize(packet.getRemainingSize());
+        packet.readData(playersBuff.data(), packet.getRemainingSize());
+        // TODO sprawdzić czy to działa
+        std::vector<std::string> playerNames;
+        std::string stringIt;
+        for (int i = 0; i < playersBuff.size(); ++i) {
+            if (playersBuff[i] == '\0') {
+                playerNames.push_back(stringIt);
+                stringIt = "";
+            } else {
+                if (!charOK(playersBuff[i]))
+                    throw Packet::FatalDecodingException();
+                stringIt += playersBuff[i];
+            }
+        }
+        if (!stringIt.empty())
+            throw Packet::FatalDecodingException();
+        newGameData.playerNames = playerNames;
+        size_t namesSize = 0;
+        for (const auto &it : playerNames) {
+            namesSize += it.size() + 1;
+        }
+        newGameData.playerNameSize = namesSize;
+        return std::make_shared<NewGameData>(newGameData);
+    }
 };
 
 class PixelEventData : public EventData {
     uint8_t playerNumber;
     uint32_t x, y;
+    PixelEventData() {
+        type = ServerEventType::PIXEL;
+    }
 public:
     PixelEventData(uint8_t player_name, uint32_t x, uint32_t y) : playerNumber(player_name), x(x), y(y) {
         type = ServerEventType::PIXEL;
@@ -255,12 +294,19 @@ public:
         write32ToPacket(packet, x);
         write32ToPacket(packet, y);
     }
-
-    void decode() override {}
+    // Type has already been read.
+    static std::shared_ptr<EventData> decode(ReadPacket &packet) {
+        PixelEventData pixelEventData;
+        packet.readData(&(pixelEventData.playerNumber), sizeof(pixelEventData.playerNumber));
+        read32FromPacket(packet, pixelEventData.x);
+        read32FromPacket(packet, pixelEventData.y);
+        return std::make_shared<PixelEventData>(pixelEventData);
+    }
 };
 
 class PlayerEliminatedData : public EventData {
     uint8_t playerNumber;
+    PlayerEliminatedData() { type = PLAYER_ELIMINATED;};
 public:
     PlayerEliminatedData(uint8_t player_number) : playerNumber(player_number) {
         type = ServerEventType::PLAYER_ELIMINATED;
@@ -278,7 +324,11 @@ public:
         return sizeof(playerNumber) + EventData::getSize();
     }
 
-    void decode() override {}
+    static std::shared_ptr<EventData> decode(ReadPacket &packet) {
+        PlayerEliminatedData playerEliminatedData;
+        packet.readData(&playerEliminatedData.playerNumber, sizeof(playerEliminatedData.playerNumber));
+        return std::make_shared<PlayerEliminatedData>(playerEliminatedData);
+    }
 };
 
 class GameOver : public EventData {
@@ -294,8 +344,8 @@ public:
         packet.write(&typeNetwork, sizeof(typeNetwork));
     }
 
-    void decode() override {
-
+    static std::shared_ptr<EventData> decode(ReadPacket &packet) {
+        return std::make_shared<GameOver>(GameOver());
     }
 };
 
@@ -304,6 +354,9 @@ class Record {
     using crc32_t = uint32_t;
     uint32_t len;
     std::shared_ptr<EventData> eventData;
+    uint32_t crc32;
+    Record() = default;
+    static uint8_t constexpr max_event_type = 3;
 public:
     Record(uint32_t eventNo, std::shared_ptr<EventData> eventData) {
         this->eventData = std::move(eventData);
@@ -323,12 +376,41 @@ public:
         write32ToPacket(packet, len);
         write32ToPacket(packet, eventNo);
         eventData->encode(packet);
-        uint32_t m_crc32 = Message::genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
+        Message message;
+        uint32_t m_crc32 = message.genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
         write32ToPacket(packet, m_crc32);
     }
 
-    void decode() {
-
+    static Record decode(ReadPacket &packet) {
+        // We want to read len first.
+        if (sizeof(uint32_t) > packet.getRemainingSize())
+            throw Packet::PacketToSmallException();
+        Record record;
+        read32FromPacket(packet, record.len);
+        if (record.len + sizeof(crc32_t) < packet.getRemainingSize())
+            throw Packet::PacketToSmallException();
+        read32FromPacket(packet, record.eventNo);
+        uint8_t event_type;
+        packet.readData(&event_type, sizeof(uint8_t));
+        if (event_type > max_event_type)
+            throw Packet::FatalDecodingException();
+        ServerEventType eventType = static_cast<ServerEventType>(event_type);
+        std::shared_ptr<EventData> ev;
+        switch (eventType) {
+            case ServerEventType::PIXEL:
+                ev = PixelEventData::decode(packet);
+                break;
+            case ServerEventType::NEW_GAME:
+                ev = NewGameData::decode(packet);
+                break;
+            case ServerEventType::PLAYER_ELIMINATED:
+                ev = PlayerEliminatedData::decode(packet);
+            case ServerEventType::GAME_OVER:
+                ev = GameOver::decode(packet);
+        }
+        record.eventData = ev;
+        read32FromPacket(packet, record.crc32);
+        return record;
     }
 };
 
@@ -338,6 +420,13 @@ public:
         if (packet.getRemainingSize() < sizeof(gameId))
             throw Packet::PacketToSmallException();
         write32ToPacket(packet, gameId);
+    }
+
+    // gets gameID
+    static uint32_t getGameId(ReadPacket &packet) {
+        uint32_t gameId;
+        read32FromPacket(packet, gameId);
+        return gameId;
     }
 };
 

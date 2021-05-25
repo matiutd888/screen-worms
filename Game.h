@@ -171,7 +171,7 @@ public:
                                                               pixels(width, std::vector<bool>(height, false)), turningSpeed(turningSpeed), isGameRightNow(
                     false) {};
 
-    std::vector<Record> startNewGame(const std::vector<Player> &gamePlayers, Random &random) {
+    std::vector<Record> startNewGame(std::vector<Player> &gamePlayers, Random &random) {
         clearBoard();
         isGameRightNow = true;
         std::sort(gamePlayers.begin(), gamePlayers.end());

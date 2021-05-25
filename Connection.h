@@ -203,6 +203,10 @@ public:
 //        sessionID = sessionId;
 //    }
 
+    [[nodiscard]] const sockaddr_storage &getSockaddrStorage() const {
+        return sockaddrStorage;
+    }
+
     friend std::ostream &operator<<(std::ostream &os, const Client &client) {
         os << " ipAddress: " << client.ipAddress  << "portNum: " << client.portNum;
         return os;

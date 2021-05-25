@@ -18,21 +18,21 @@ protected:
 public:
     class PacketToSmallException : std::exception {
         const char * what() const noexcept override {
-            std::cerr << "PACKET TO SMALL TO PERFORM READ / WRITE " << std::endl;
+            return "PACKET TO SMALL TO PERFORM READ / WRITE ";
         }
     };
 
     class FatalEncodingException : std::exception {
     public:
         const char *what() const noexcept override {
-            std::cerr << "Parse exception occured!" << std::endl;
+            return "Parse exception occured!";
         }
     };
 
     class FatalDecodingException : std::exception {
     public:
         const char *what() const noexcept override {
-            std::cerr << "Parse exception occured!" << std::endl;
+            return "Parse exception occured!";
         }
     };
     static size_t getMaxSize() {
