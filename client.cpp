@@ -156,8 +156,12 @@ class ClientSide {
     uint64_t sessionID;
     void handleGuiMessage(const std::string &guiMsgStr) {
         GUIMessage guiMessage;
+
         try {
             guiMessage = getGuiMessage(guiMsgStr);
+            if (guiMessage != lastGuiMessage) {
+                debug_out_1 << " CHANGED DIRECTION ";
+            }
             if (guiMessage == LEFT_KEY_UP) {
                 if (lastGuiMessage == LEFT_KEY_DOWN) {
                     direction = TurnDirection::STRAIGHT;
@@ -182,19 +186,22 @@ class ClientSide {
                     lastGuiMessage = guiMessage;
                 }
             }
+            std::cout << "currDirection = " << direction << std::endl;
         } catch (...) {
             std::cerr << "[GUI] " << " GUI MESSAGE NOT VALID " << std::endl;
         }
     }
 
     void handleGameOver() {
+        std::cout << "RECEIVED GAME OVER " << std::endl;
         nextExpectedEventNo = 0;
         isInGame = false;
+        currGameId = 0;
     }
 
     void handlePlayerEliminated(Record &record) {
         std::shared_ptr<PlayerEliminatedData> playerEliminatedData = (const std::shared_ptr<PlayerEliminatedData> &) record.getEventData();
-        std::string playerStr = "PLAYER ELIMINATED";
+        std::string playerStr = "PLAYER_ELIMINATED";
         uint8_t playerNumber = playerEliminatedData->getPlayerNumber();
         if (playerNumber >= players.size()) {
             std::cerr << "Player Eliminated: Ivalid player number! " << std::endl;
@@ -261,12 +268,16 @@ public:
 //    }
 
 
-    void sendLineToGUI(std::string line) {
+    void sendLineToGUI(const std::string &line) {
         std::string lineWithNewLine = line + "\n";
         send(pollClient.getDescriptor(PollClient::MESSAGE_GUI), lineWithNewLine.c_str(), lineWithNewLine.size(), 0);
     }
 
-    void tryToReadNewGame(ReadPacket &packet) {
+//    void appendWithoutNullSign(std::string &line, const std::string &strToAppend) {
+//        for(int i = 0; i < strToAppend.size(); i++)
+//            line.push_back()
+//    }
+    void tryToReadNewGame(ReadPacket &packet, uint32_t rcvdGameId) {
         debug_out_0 << "Received new Game " << std::endl;
         Record record = Record::decode(packet);
         if (record.getEventType() != ServerEventType::NEW_GAME) {
@@ -280,7 +291,7 @@ public:
         std::shared_ptr<NewGameData> newGamePtr = (const std::shared_ptr<NewGameData> &) record.getEventData();
         debug_out_0 << "New game comunicate correct " << std::endl;
         std::cout << *newGamePtr << std::endl;
-        std::string newGameString = "NEW GAME";
+        std::string newGameString = "NEW_GAME";
         newGameString.append(" ");
         newGameString.append(std::to_string(newGamePtr->getX()));
         newGameString.append(" ");
@@ -292,6 +303,7 @@ public:
         }
         sendLineToGUI(newGameString);
         isInGame = true;
+        currGameId = rcvdGameId;
         nextExpectedEventNo = 1;
     }
 
@@ -323,12 +335,14 @@ public:
                 ReadPacket readPacket;
                 sockaddr_storage sockaddrStorage;
                 socklen_t addrLen;
-                recvfrom(pollClient.getDescriptor(PollClient::MESSAGE_SERVER), readPacket.getBuffer(),
+                ssize_t size = recvfrom(pollClient.getDescriptor(PollClient::MESSAGE_SERVER), readPacket.getBuffer(),
                          readPacket.getMaxSize(), 0, reinterpret_cast<sockaddr *>(&sockaddrStorage),
                          &addrLen);
+                readPacket.setSize(size);
                 uint32_t rcvdGameID = ServerMessage::getGameId(readPacket);
                 std::cout << "received game id = " << rcvdGameID << std::endl;
                 if (isInGame) {
+                    std::cout << " is is game!" << std::endl;
                     if (rcvdGameID == currGameId) {
                         try {
                             while (1) {
@@ -338,23 +352,26 @@ public:
                         } catch (...) {
                             std::cerr << "Error / END parsing event record";
                         }
+                    } else {
+                        std::cout << "received Game id incorrect" << std::endl;
                     }
                 } else {
+                    std::cout << " is NOT is game!" << std::endl;
                     try {
-                        tryToReadNewGame(readPacket);
+                        tryToReadNewGame(readPacket, rcvdGameID);
                         while (1) {
                             Record record = Record::decode(readPacket);
                             handleGameRecord(record);
                         }
-                    } catch (...) {
+                    } catch (Packet::PacketToSmallException p) {
                         std::cerr << "Error reading newGame " << std::endl;
                     }
                 }
             }
             if (pollClient.hasPollinOccurred(PollClient::INTERVAL_SENDMESSAGE)) {
-                std::cout << "Sending message to server!" << std::endl;
+                // std::cout << "Sending message to server!" << std::endl;
                 ClientMessage clientMessage(sessionID, static_cast<uint8_t>(direction), nextExpectedEventNo, data.getPlayerName().c_str(), data.getPlayerName().size());
-                std::cout << clientMessage << std::endl;
+                // std::cout << clientMessage << std::endl;
                 WritePacket writePacket;
                 clientMessage.encode(writePacket);
                 sendto(sock.getSocket(), writePacket.getBufferConst(), writePacket.getOffset(), 0,

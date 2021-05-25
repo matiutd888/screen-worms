@@ -63,7 +63,7 @@ public:
     }
 
     bool isPlayerReady() const {
-        return isObserver() && isReady;
+        return !isObserver() && isReady;
     }
 
     bool operator<(const Player &rhs) const {
@@ -137,7 +137,7 @@ class Game {
     bool isGameRightNow;
 
     bool isDead(uint32_t x, uint32_t y) {
-        return pixels[x][y];
+        return (x >= width || y >= height) || pixels[x][y];
     }
 
     std::vector<std::string> generateNamesVector(const std::vector<Player> &players) {
@@ -177,7 +177,7 @@ public:
         std::sort(gamePlayers.begin(), gamePlayers.end());
         std::vector<Record> records;
         gameID = random.generate();
-
+        eventCount = 0;
         auto newGameEvent = std::make_shared<NewGameData>(NewGameData(width, height,generateNamesVector(gamePlayers)));
         records.emplace_back(Record(eventCount++, newGameEvent));
         for (size_t i = 0; i < gamePlayers.size(); i++) {
@@ -197,6 +197,7 @@ public:
                     return records;
                 }
             } else {
+                std::cout << "x, y = " << x<< " " << y << std::endl;
                 records.emplace_back(
                         Record(eventCount++, std::make_shared<PixelEventData>(PixelEventData(i, x, y))));
                 int direction = random.generate() % Worm::N_DEGREES;

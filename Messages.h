@@ -147,36 +147,44 @@ public:
         write64ToPacket(packet, sessionID);
         packet.write(&turnDirection, sizeof(turnDirection));
         write32ToPacket(packet, nextExpectedEventNo);
+//        std::cout << "encoding name " << playerName << " of size " << playerNameSize << std::endl;
         packet.write(playerName, playerNameSize);
     };
 
     static ClientMessage decode(ReadPacket &packet) {
         ClientMessage clientMessage;
 
-        debug_out_1 << "Decoding Client Message" << std::endl;
+        //debug_out_1 << "Decoding Client Message" << std::endl;
         if (packet.getRemainingSize() < minimumMessageSize()) {
             throw Packet::PacketToSmallException();
         }
         read64FromPacket(packet, clientMessage.sessionID);
-        debug_out_1 << "Read session ID = " << clientMessage.sessionID << std::endl;
+        //debug_out_1 << "Read session ID = " << clientMessage.sessionID << std::endl;
         packet.readData(&clientMessage.turnDirection, sizeof(turnDirection));
-        debug_out_1 << "READ turn direction = " << uint64_t(clientMessage.turnDirection) << std::endl;
+        //debug_out_1 << "READ turn direction = " << uint64_t(clientMessage.turnDirection) << std::endl;
         if (clientMessage.turnDirection > Utils::TURN_MAX_VALUE)
             throw Packet::FatalDecodingException();
 
         read32FromPacket(packet, clientMessage.nextExpectedEventNo);
-        debug_out_1 << " READ next expected event no = " << clientMessage.nextExpectedEventNo << std::endl;
+        //debug_out_1 << " READ next expected event no = " << clientMessage.nextExpectedEventNo << std::endl;
 
         size_t remainingSize = packet.getRemainingSize();
         if (remainingSize > MAX_PLAYER_NAME_LENGTH) {
             std::cerr << "ERROR: Remaining size  > MAX_PLAYER_NAME_LENGTH " << std::endl;
             throw Packet::FatalDecodingException();
         }
+        if (remainingSize == 0) {
+            clientMessage.playerNameSize = 0;
+            return clientMessage;
+        }
+//        std::cout << "REMAINING SIZE = " << remainingSize << std::endl;
         packet.readData(clientMessage.playerName, remainingSize);
         std::string s;
+//        std::cout << clientMessage.playerName << " " << std::endl;
+        clientMessage.playerNameSize = remainingSize;
         s.resize(clientMessage.getPlayerNameSize());
         memcpy(s.data(), clientMessage.playerName, clientMessage.playerNameSize);
-        debug_out_1 << "READ player name = " << s << std::endl;
+//        debug_out_1 << "READ player name string = " << s << std::endl;
         clientMessage.playerNameSize = remainingSize;
         if (!checkIfNameOK(clientMessage.playerName, clientMessage.playerNameSize))
             throw Packet::FatalDecodingException();
@@ -193,7 +201,12 @@ public:
     [[nodiscard]] const char *getPlayerName() const {
         return playerName;
     }
-
+    [[nodiscard]] std::string getStringPlayerName() const {
+        std::string s;
+        s.resize(playerNameSize);
+        memcpy(s.data(), playerName, playerNameSize);
+        return s;
+    };
     [[nodiscard]] uint32_t getNextExpectedEventNo() const {
         return nextExpectedEventNo;
     }
@@ -266,17 +279,23 @@ public:
         }
     }
 
-    static std::shared_ptr<EventData> decode(ReadPacket &packet) {
+    static std::shared_ptr<EventData> decode(ReadPacket &packet, uint32_t eventDataLen) {
         NewGameData newGameData;
         read32FromPacket(packet, newGameData.x);
+        std::cout << "NEWGAME.X = " << newGameData.x << std::endl;
+        std::cout << "remaining Size = " << packet.getRemainingSize() << " sizeof(uint32) = " << 4 << std::endl;
         read32FromPacket(packet, newGameData.y);
+        std::cout << "NEWGAME.Y = " << newGameData.y;
         std::string playersBuff;
-        playersBuff.resize(packet.getRemainingSize());
-        packet.readData(playersBuff.data(), packet.getRemainingSize());
+        size_t remainingSize = eventDataLen - sizeof(newGameData.x) - sizeof(newGameData.y);
+        playersBuff.resize(remainingSize);
+        packet.readData(playersBuff.data(), remainingSize);
         // TODO sprawdzić czy to działa
+        std::cout << "reading players buff done" << std::endl;
         std::vector<std::string> playerNames;
         std::string stringIt;
         for (int i = 0; i < playersBuff.size(); ++i) {
+            std::cout << "READING CHAR "<< playersBuff[i] << " charCode = " << int(playersBuff[i]) << std::endl;
             if (playersBuff[i] == '\0') {
                 playerNames.push_back(stringIt);
                 stringIt = "";
@@ -440,29 +459,38 @@ public:
     }
 
     void encode(WritePacket &packet) const {
+        std::cout << "Encoding Record: " << std::endl;
         if (getSize() > packet.getRemainingSize())
             throw Packet::PacketToSmallException();
         uint32_t sizeNoCRC32 = getSize() - sizeof(crc32_t);
         size_t initialOffset = packet.getOffset();
+        std::cout << "Len = " << len << std::endl;
         write32ToPacket(packet, len);
+        std::cout << "eventNo = " << eventNo << std::endl;
         write32ToPacket(packet, eventNo);
+        std::cout << "eventDataType = " << eventData->getType() << std::endl;
         eventData->encode(packet);
         Message message;
-        uint32_t m_crc32 = message.genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
+//        uint32_t m_crc32 = message.genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
+        uint32_t m_crc32 = 0;
         write32ToPacket(packet, m_crc32);
     }
 
     static Record decode(ReadPacket &packet) {
+        std::cout << "DECODING PACKET, size = " << packet.getRemainingSize() << std::endl;
         // We want to read len first.
         if (sizeof(uint32_t) > packet.getRemainingSize())
             throw Packet::PacketToSmallException();
         Record record;
         read32FromPacket(packet, record.len);
-        if (record.len + sizeof(crc32_t) < packet.getRemainingSize())
+        std::cout << "Received len = " << record.len << std::endl;
+        if (record.len + sizeof(crc32_t) > packet.getRemainingSize())
             throw Packet::PacketToSmallException();
         read32FromPacket(packet, record.eventNo);
+        std::cout << "Received eventNo = " << record.eventNo << std::endl;
         uint8_t event_type;
         packet.readData(&event_type, sizeof(uint8_t));
+        std::cout << "Received eventType = " << event_type << std::endl;
         if (event_type > max_event_type)
             throw Packet::FatalDecodingException();
         auto eventType = static_cast<ServerEventType>(event_type);
@@ -472,7 +500,8 @@ public:
                 ev = PixelEventData::decode(packet);
                 break;
             case ServerEventType::NEW_GAME:
-                ev = NewGameData::decode(packet);
+                std::cout << "[MESSAGES] Received New game!" << std::endl;
+                ev = NewGameData::decode(packet, record.len - sizeof(uint8_t) - sizeof(uint32_t))     ;
                 break;
             case ServerEventType::PLAYER_ELIMINATED:
                 ev = PlayerEliminatedData::decode(packet);

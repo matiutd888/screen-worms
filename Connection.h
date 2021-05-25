@@ -234,11 +234,11 @@ public:
         if (s->sa_family == AF_INET) {
             ipType = IPaddressType::IPv4;
             portNum = ntohs(((struct sockaddr_in *) s)->sin_port);
-            debug_out_1 << "IP TYPE = IPV4" << std::endl;
+//            debug_out_1 << "IP TYPE = IPV4" << std::endl;
         } else if (s->sa_family == AF_INET6) {
             ipType = IPaddressType::IPv6;
             portNum = ntohs(((struct sockaddr_in6 *) s)->sin6_port);
-            debug_out_1 << "IP TYPE = IPV6" << std::endl;
+//            debug_out_1 << "IP TYPE = IPV6" << std::endl;
         } else {
             syserr("Client: Incorrect sa_family!");
         }

@@ -44,6 +44,7 @@ public:
                                                                                       random(seed) {};
 
     [[nodiscard]] std::vector<Record> getRecords(uint32_t next_expected_event_no) const {
+//        std::cout << "getRecordsSize = " << gameRecords.size() << std::endl;
         if (next_expected_event_no >= gameRecords.size())
             return std::vector<Record>();
         return std::vector<Record>(gameRecords.begin() + next_expected_event_no, gameRecords.end());
@@ -58,6 +59,7 @@ public:
             bool fits = true;
             while (fits && it < records.size()) {
                 try {
+//                    std::cout << "encoding event nr " << it << " to packet numer" << packets.size() << std::endl;
                     records[it].encode(packet);
                     it++;
                 } catch (const Packet::PacketToSmallException &p) {
@@ -94,6 +96,7 @@ public:
     }
 
     bool canGameStart() const {
+        std::cout << "cout not observers " << countNotObservers << " count ready players" << countReadyPlayers << std::endl;
         return !game.isGameNow() && countReadyPlayers == countNotObservers && countNotObservers >= 2;
     }
 
@@ -120,10 +123,10 @@ public:
 
     void addClient(const Client &client, const ClientMessage &newMsg) {
         // newMsg.
-        if (!isNameUnique(newMsg.getPlayerName(), client))
+        if (!isNameUnique(newMsg.getStringPlayerName(), client))
             throw std::invalid_argument("Invalid argument");
 
-        Player player(newMsg.getPlayerName(), static_cast<TurnDirection>(newMsg.getTurnDirection()),
+        Player player(newMsg.getStringPlayerName(), static_cast<TurnDirection>(newMsg.getTurnDirection()),
                       newMsg.getSessionId());
 
 
@@ -162,14 +165,16 @@ public:
 
     void updateClientPlayersInfo(const Client &client, clientValue_t &val, const ClientMessage &message) {
         Player &player = std::get<PLAYER_INDEX>(val);
+//        std::cout << "Updating client " << player << std::endl;
         bool before = player.isPlayerReady();
         player.setDirection(static_cast<TurnDirection>(message.getTurnDirection()));
         if (game.isGameNow()) {
             game.updatePlayer(player);
         } else {
             bool after = player.isPlayerReady();
-            if (!before && after)
+            if (!before && after) {
                 countReadyPlayers++;
+            }
         }
         std::get<TICKS_INDEX>(val) = 0;
         pushClientMessagesOnQueue(client, message.getNextExpectedEventNo());
@@ -181,7 +186,7 @@ public:
         if (!clientExists(newClient)) {
             if (clients.size() + 1 > Utils::GAME_CLIENTS_LIMIT)
                 return;
-            if (!isNameUnique(newMsg.getPlayerName(), newClient))
+            if (!isNameUnique(newMsg.getStringPlayerName(), newClient))
                 return;
             addClient(newClient, newMsg);
             return;
@@ -193,14 +198,14 @@ public:
         if (std::get<PLAYER_INDEX>(clientValue).getSessionId() < newMsg.getSessionId()) {
             return;
         }
-        if (!isNameUnique(newMsg.getPlayerName(), mapClient))
+        if (!isNameUnique(newMsg.getStringPlayerName(), mapClient))
             return;
         if (std::get<PLAYER_INDEX>(clientValue).getSessionId() > newMsg.getSessionId()) {
             removeClient(it);
             addClient(newClient, newMsg);
             return;
         }
-        if (std::get<PLAYER_INDEX>(clientValue).getName() == newMsg.getPlayerName()) {
+        if (std::get<PLAYER_INDEX>(clientValue).getName() == newMsg.getStringPlayerName()) {
             updateClientPlayersInfo(it->first, clientValue, newMsg);
         } else {
             removeClient(it);
@@ -228,7 +233,10 @@ public:
         }
         debug_out_0 << TAG << "Starting new game with " << countReadyPlayers << " ready players and " << clients.size() - countNotObservers << " observers\n";
         std::vector<Record> records = game.startNewGame(gamePlayers, random);
-        gameRecords.insert(gameRecords.end(), records.begin(), records.end());
+        for (auto &r: records) {
+            gameRecords.push_back(r);
+        }
+        debug_out_0 << TAG << "Game started succesfully " << std::endl;
         return records;
     }
 
@@ -326,24 +334,30 @@ public:
                 readTimeout(pollServer.getDescriptor(PollServer::TIMEOUT_CLIENT));
             }
             if (pollServer.hasPollinOccurred(PollServer::MESSAGE_CLIENT)) {
-                debug_out_1 << TAG << "Client message!" << std::endl;
+                // debug_out_1 << TAG << "Client message!" << std::endl;
                 try {
                     struct sockaddr_storage clientAddr;
                     ReadPacket packet;
                     readFromClients(clientAddr, packet);
                     ClientMessage clientMessage = ClientMessage::decode(packet);
-                    debug_out_1 << clientMessage << std::endl;
+                    // debug_out_1 << clientMessage << std::endl;
                     Client client(clientAddr);
                     manager.handleClient(client, clientMessage);
                     if (!manager.getGame().isGameNow()) {
                         if (manager.canGameStart()) {
                             manager.startGame();
-                            manager.pushPacketsForAll(manager.constructPackets(manager.getRecords(0)));
+                            auto r = manager.getRecords(0);
+                            std::cout << "NEW GAME EVENTS " << std::endl;
+                            for(auto &r_it : r) {
+                                std::cout << "EVENT " << r_it.getEventNo() << ", " << r_it.getEventData()->getType() << std::endl;
+                            }
+                            manager.pushPacketsForAll(manager.constructPackets(r));
+                            std::cout << "pusing packets done!" << std::endl;
                         } else {
                             debug_out_1 << "Game cannot start!" << std::endl;
                         }
                     }
-                } catch (...) {
+                } catch (const Packet::PacketToSmallException &p) {
                     debug_out_0 << "Error decoding client message!" << std::endl;
                     continue;
                 }
@@ -352,10 +366,10 @@ public:
                 auto packetToSend = manager.packetsQueuePop();
                 sendPacketToClient(packetToSend.first, packetToSend.second);
                 pollServer.removePolloutFromEvents(PollServer::MESSAGE_CLIENT);
-                debug_out_1 << "Removing pollout " << std::endl;
+//                debug_out_1 << "Removing pollout " << std::endl;
             }
             if (manager.hasMessages()) {
-                debug_out_1 << "Adding POLLOUT" << std::endl;
+//                debug_out_1 << "Adding POLLOUT" << std::endl;
                 pollServer.addPolloutToEvents(PollServer::MESSAGE_CLIENT);
             }
         }
