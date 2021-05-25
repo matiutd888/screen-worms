@@ -296,7 +296,7 @@ public:
     }
 
     void start() {
-
+        std::cout << "starting client " << std::endl;
         __gnu_cxx::stdio_filebuf<char> filebuf(pollClient.getDescriptor(PollClient::MESSAGE_GUI), std::ios::in);
         std::istream guiInputStream(&filebuf);
         while (1) {
