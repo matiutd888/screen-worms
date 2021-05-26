@@ -44,7 +44,6 @@ public:
                                                                                       random(seed) {};
 
     [[nodiscard]] std::vector<Record> getRecords(uint32_t next_expected_event_no) const {
-//        std::cout << "getRecordsSize = " << gameRecords.size() << std::endl;
         if (next_expected_event_no >= gameRecords.size())
             return std::vector<Record>();
         return std::vector<Record>(gameRecords.begin() + next_expected_event_no, gameRecords.end());
@@ -59,7 +58,6 @@ public:
             bool fits = true;
             while (fits && it < records.size()) {
                 try {
-//                    std::cout << "encoding event nr " << it << " to packet numer" << packets.size() << std::endl;
                     records[it].encode(packet);
                     it++;
                 } catch (const Packet::PacketToSmallException &p) {

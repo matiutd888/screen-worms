@@ -109,6 +109,7 @@ public:
         serverAddress = argv[1];
         optind = 2;
         while ((c = getopt(argc, argv, "n:p:i:r:")) != -1) {
+            // TODO wywalać się jak nie poda
             std::string argStr(optarg);
             size_t convertedSize = 0;
             printf("%c\n", c);
@@ -325,13 +326,14 @@ public:
                 std::cout << "No DoPol events!" << std::endl;
             }
             if (pollClient.hasPollinOccurred(PollClient::MESSAGE_GUI)) {
-                std::cout << "MESSAGE GUI " << std::endl;
+                debug_out_1 << "MESSAGE GUI " << std::endl;
                 std::string guiMsgStr;
                 if (getline(guiInputStream, guiMsgStr)) {
-                    std::cout << "[GUI] " << "read " << guiMsgStr << " from GUI!" << std::endl;
+                    debug_out_1 << "[GUI] " << "read " << guiMsgStr << " from GUI!" << std::endl;
                     handleGuiMessage(guiMsgStr);
                 } else {
-                    std::cerr << "Invalid read from GUI " << std::endl;
+                    std::cerr << "Invalid read from GUI " << std::endl; // TODO czy to dobrze
+                    exit(1);
                 }
             }
             if (pollClient.hasPollinOccurred(PollClient::MESSAGE_SERVER)) {
@@ -359,7 +361,7 @@ public:
                             handleGameRecord(record);
                             if (!record.checkCrcOk(readPacket, initialOffset)) {
                                 throw CrcMaker::InvalidCrcException();
-                            }
+                            } // TODO exit(1) w razie dobrego CRC
                             initialOffset = readPacket.getOffset();
                         }
                     } catch (const Packet::PacketToSmallException &p) {

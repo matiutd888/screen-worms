@@ -26,7 +26,7 @@ enum IPaddressType {
 class Socket {
 protected:
     int socknum;
-public:                                                 // SOCK_DGRAM | SOCK_STREAM
+public:
     Socket() = default;
 
     [[nodiscard]] int getSocket() const {
@@ -224,20 +224,16 @@ public:
         if (s->sa_family == AF_INET) {
             ipType = IPaddressType::IPv4;
             portNum = ntohs(((struct sockaddr_in *) s)->sin_port);
-//            debug_out_1 << "IP TYPE = IPV4" << std::endl;
         } else if (s->sa_family == AF_INET6) {
             ipType = IPaddressType::IPv6;
             portNum = ntohs(((struct sockaddr_in6 *) s)->sin6_port);
-//            debug_out_1 << "IP TYPE = IPV6" << std::endl;
         } else {
             syserr("Client: Incorrect sa_family!");
         }
-
         char buffIP[INET6_ADDRSTRLEN];
         if (inet_ntop(s->sa_family, getInAddr(s), buffIP, sizeof(buffIP)) == NULL) {
             syserr("Client: Error during inet_ntop!");
         }
-
         ipAddress = std::string(buffIP);
     }
 };
