@@ -21,7 +21,7 @@ namespace Utils {
     static inline const char *const optstring = "p:s:t:v:w:h:";
 
     static constexpr int TIMEOUT_CLIENTS_SEC = 2;
-    static constexpr int DEFAULT_ROUNDS_PER_SEC = 50;
+    static constexpr int DEFAULT_ROUNDS_PER_SEC = 25; // TODO zmienić na 25.
     static constexpr uint32_t DEFAULT_BOARD_WIDTH = 640;
     static constexpr uint32_t DEFAULT_BOARD_HEIGHT = 480;
     static constexpr int DEFAULT_TURINING_SPEED = 6;

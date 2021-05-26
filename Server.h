@@ -414,7 +414,6 @@ public:
         for (auto &it : clients) {
             it.second.first.setReady(false);
         }
-        // gameRecords.clear();
         countReadyPlayers = 0;
     }
 
@@ -424,7 +423,6 @@ public:
             gameRecords.push_back(r_it);
         }
         queue.setEventsCount(gameRecords.size());
-        //pushPacketsForAll(constructPackets(records));
         if (!game.isGameNow()) {
             endGame();
         }

@@ -110,7 +110,7 @@ public:
         uint32_t crc = 0xffffffff;
         uint32_t index;
         for (size_t i = 0; i < bufsize; i++) {
-            index = (crc ^ crcTable()[i]) & 0xFF;
+            index = (crc ^ buffer[i]) & 0xFF;
             crc = (crc >> 8) ^ crcTable()[index];
         }
         return crc ^ 0xffffffff;
