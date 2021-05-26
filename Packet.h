@@ -120,10 +120,12 @@ public:
         offset += dataSize;
     }
 
-    bool isok() {
+    bool isok() const {
         return isOK;
     }
-
+    size_t getOffset() const {
+        return offset;
+    }
     static inline std::string TAG = "ReadPacket: ";
 };
 

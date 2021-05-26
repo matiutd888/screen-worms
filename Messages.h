@@ -50,7 +50,7 @@ inline bool charOK(char c) {
     return true;
 }
 
-class Message {
+class CrcMaker {
     static uint32_t* crcTable() {
         static uint32_t mTable[256] = {
                 0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f,
@@ -100,17 +100,22 @@ class Message {
         return mTable;
     }
 public:
-    uint32_t genCRC(const char *buffer, size_t bufsize) {
-        uint32_t crc = 0xffffffff;
-        size_t i;
-        for (i = 0; i < bufsize; i++)
-            crc = crcTable()[*buffer++ ^ (crc & 0xff)] ^ (crc >> 8);
-        return (~crc);
-    }
+    class InvalidCrcException : std::exception {
+        const char * what() const noexcept override {
+            return "Invalid crc32!";
+        }
+    };
 
-//    virtual void encode(WritePacket &packet) = 0;
-//
-//    virtual bool decode(const ReadPacket &packet) = 0;
+    static uint32_t genCRC(const char *buffer, size_t bufsize) {
+        uint32_t crc = 0xffffffff;
+        uint32_t index;
+        for (size_t i = 0; i < bufsize; i++) {
+            index = (crc ^ crcTable()[i]) & 0xFF;
+            std::cout << "index = " << index << std::endl;
+            crc = (crc >> 8) ^ crcTable()[index];
+        }
+        return crc ^ 0xffffffff;
+    }
 };
 
 class ClientMessage {
@@ -245,6 +250,12 @@ public:
     [[nodiscard]] ServerEventType getType() const {
         return type;
     }
+
+    class InvalidTypeException : std::exception {
+        const char * what() const noexcept override {
+            return "Expected diferent type of event! (type invalid or just not expected)\n";
+        }
+    };
 };
 
 class NewGameData : public EventData {
@@ -282,20 +293,14 @@ public:
     static std::shared_ptr<EventData> decode(ReadPacket &packet, uint32_t eventDataLen) {
         NewGameData newGameData;
         read32FromPacket(packet, newGameData.x);
-        std::cout << "NEWGAME.X = " << newGameData.x << std::endl;
-        std::cout << "remaining Size = " << packet.getRemainingSize() << " sizeof(uint32) = " << 4 << std::endl;
         read32FromPacket(packet, newGameData.y);
-        std::cout << "NEWGAME.Y = " << newGameData.y;
         std::string playersBuff;
         size_t remainingSize = eventDataLen - sizeof(newGameData.x) - sizeof(newGameData.y);
         playersBuff.resize(remainingSize);
         packet.readData(playersBuff.data(), remainingSize);
-        // TODO sprawdzić czy to działa
-        std::cout << "reading players buff done" << std::endl;
         std::vector<std::string> playerNames;
         std::string stringIt;
         for (int i = 0; i < playersBuff.size(); ++i) {
-            std::cout << "READING CHAR "<< playersBuff[i] << " charCode = " << int(playersBuff[i]) << std::endl;
             if (playersBuff[i] == '\0') {
                 playerNames.push_back(stringIt);
                 stringIt = "";
@@ -464,15 +469,15 @@ public:
             throw Packet::PacketToSmallException();
         uint32_t sizeNoCRC32 = getSize() - sizeof(crc32_t);
         size_t initialOffset = packet.getOffset();
+        std::cout << "Initial offset " << initialOffset << std::endl;
         std::cout << "Len = " << len << std::endl;
         write32ToPacket(packet, len);
         std::cout << "eventNo = " << eventNo << std::endl;
         write32ToPacket(packet, eventNo);
         std::cout << "eventDataType = " << eventData->getType() << std::endl;
         eventData->encode(packet);
-        Message message;
-//        uint32_t m_crc32 = message.genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
-        uint32_t m_crc32 = 0;
+        uint32_t m_crc32 = CrcMaker::genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
+//        uint32_t m_crc32 = 0;
         write32ToPacket(packet, m_crc32);
     }
 
@@ -500,7 +505,6 @@ public:
                 ev = PixelEventData::decode(packet);
                 break;
             case ServerEventType::NEW_GAME:
-                std::cout << "[MESSAGES] Received New game!" << std::endl;
                 ev = NewGameData::decode(packet, record.len - sizeof(uint8_t) - sizeof(uint32_t))     ;
                 break;
             case ServerEventType::PLAYER_ELIMINATED:
@@ -523,6 +527,10 @@ public:
 
     [[nodiscard]] ServerEventType getEventType() const {
         return eventData->getType();
+    }
+
+    bool checkCrcOk(ReadPacket &packet, size_t initialOffset) {
+        return crc32 == CrcMaker::genCRC(packet.getBufferWithOffsetConst(initialOffset), getSize() - sizeof(crc32_t));
     }
 };
 

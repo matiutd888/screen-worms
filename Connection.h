@@ -131,7 +131,6 @@ public:
         memset(&hints, 0, sizeof hints);
         hints.ai_family = AF_UNSPEC; // set to AF_INET to use IPv4
         hints.ai_socktype = SOCK_STREAM;
-//        hints.ai_flags = AI_PASSIVE; // use my IP
 
         if (getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &servinfo) != 0) {
             syserr("getaddrinfo");
@@ -145,19 +144,19 @@ public:
                 continue;
             }
 
-//            // https://stackoverflow.com/questions/31997648/where-do-i-set-tcp-nodelay-in-this-c-tcp-client
-//            int yes = 1;
-//            int result = setsockopt(sockfd,
-//                                    IPPROTO_TCP,
-//                                    TCP_NODELAY,
-//                                    (char *) &yes,
-//                                    sizeof(int));
-//            // 1 - on, 0 - off
-//            if (result < 0) {
-//                perror("client: set sock opt");
-//                continue;
-//
-//            }
+             https://stackoverflow.com/questions/31997648/where-do-i-set-tcp-nodelay-in-this-c-tcp-client
+            int yes = 1;
+            int result = setsockopt(sockfd,
+                                    IPPROTO_TCP,
+                                    TCP_NODELAY,
+                                    (char *) &yes,
+                                    sizeof(int));
+            // 1 - on, 0 - off
+            if (result < 0) {
+                perror("client: set sock opt");
+                continue;
+            }
+
             if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
                 perror("client: connect tcp");
                 close(sockfd);
@@ -176,7 +175,6 @@ public:
 };
 
 // get sockaddr, IPv4 or IPv6:
-
 inline void *getInAddr(struct sockaddr *sa) {
     if (sa->sa_family == AF_INET) {
         return &(((struct sockaddr_in *) sa)->sin_addr);
@@ -208,14 +206,6 @@ public:
     bool operator==(const Client &rhs) const {
         return ipType == rhs.ipType && ipAddress == rhs.ipAddress && portNum == rhs.portNum;
     }
-//
-//    uint64_t getSessionID() const {
-//        return sessionID;
-//    }
-//
-//    void setSessionId(uint64_t sessionId) {
-//        sessionID = sessionId;
-//    }
 
     [[nodiscard]] const sockaddr_storage &getSockaddrStorage() const {
         return sockaddrStorage;
