@@ -87,35 +87,42 @@ TCPClientSocket::TCPClientSocket(uint16_t portNum, const char *addrName) : Socke
 
 UDPServerSocket::UDPServerSocket(uint16_t portNum, const char *addrName) : Socket() {
     int sockfd;
-    struct addrinfo hints, *servinfo, *p = NULL;
+    sockaddr_in6 server_address;
+    server_address.sin6_family = AF_INET6;
+    server_address.sin6_addr = in6addr_any;
+    server_address.sin6_port = htons(portNum);
 
-    memset(&hints, 0, sizeof hints);
-    hints.ai_family = AF_UNSPEC; // set to AF_INET to use IPv4
-    hints.ai_socktype = SOCK_DGRAM;
+    if ((sockfd = socket(AF_INET6, SOCK_DGRAM, 0)) == -1)
+        syserr("Error calling socket");
 
-    if (getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &servinfo) != 0) {
-        syserr("getaddrinfo");
-    }
-
-    // loop through all the results and bind to the first we can
-    for (p = servinfo; p != NULL; p = p->ai_next) {
-        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                             p->ai_protocol)) == -1) {
-            perror("listener: socket");
-            continue;
-        }
-        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-            close(sockfd);
-            perror("listener: bind");
-            continue;
-        }
-        break;
-    }
-
-    if (p == NULL)
-        syserr("listener: failed to bind socket\n");
+    if (bind(sockfd, reinterpret_cast<const sockaddr *>(&server_address), sizeof(server_address)) < 0)
+        syserr("bind!");
+//    struct addrinfo hints, *servinfo, *p = NULL;
+//    memset(&hints, 0, sizeof hints);
+//    hints.ai_family = AF_UNSPEC; // set to AF_INET to use IPv4
+//    hints.ai_socktype = SOCK_DGRAM;
+////    hints.ai_family.
+//    if (getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &servinfo) != 0) {
+//        syserr("getaddrinfo");
+//    }
+//
+//    // loop through all the results and bind to the first we can
+//    for (p = servinfo; p != NULL; p = p->ai_next) {
+//        if ((sockfd = socket(p->ai_family, p->ai_socktype,
+//                             p->ai_protocol)) == -1) {
+//            perror("listener: socket");
+//            continue;
+//        }
+//        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
+//            close(sockfd);
+//            perror("listener: bind");
+//            continue;
+//        }
+//        break;
+//    }
+//
+//    if (p == NULL)
+//        syserr("listener: failed to bind socket\n");
 
     socknum = sockfd;
-
-    freeaddrinfo(servinfo);
 }

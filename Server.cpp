@@ -255,7 +255,6 @@ void Server::readFromClients(sockaddr_storage &clientAddr, ReadPacket &packet) {
                                 reinterpret_cast<sockaddr *>(&clientAddr),
                                 &clientAddrLen);
 
-
     if (numBytes < 0) {
         debug_out_1 << TAG << "ERROR READING FROM CLIENT " << std::endl;
         throw Packet::FatalDecodingException();
