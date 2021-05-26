@@ -76,53 +76,76 @@ public:
         roundsPerSec = Utils::DEFAULT_ROUNDS_PER_SEC;
     }
 
-    void parse(int argc, char **argv) {
-        char c;
-        while ((c = getopt(argc, argv, Utils::optstring)) != -1) {
-            size_t convertedSize = 0;
-            std::string argStr = optarg;
-            bool haveFound = false;
-            switch (c) {
-                case 'p': {
-                    portNum = std::stoi(argStr, &convertedSize);
-                    haveFound = true;
-                    break;
-                }
-                case 's': {
-                    seed = std::stoul(argStr, &convertedSize);
-                    haveFound = true;
-                    break;
-                }
-                case 't': {
-                    turiningSpeed = std::stoi(argStr, &convertedSize);
-                    haveFound = true;
-                    break;
-                }
-                case 'v':
-                    roundsPerSec = std::stoi(argStr, &convertedSize);
-                    haveFound = true;
-                    break;
-                case 'w':
-                    width = std::stoul(argStr, &convertedSize);
-                    haveFound = true;
-                    break;
-                case 'h':
-                    height = std::stoul(argStr, &convertedSize);
-                    haveFound = true;
-                    break;
-                default:;
-            }
-            if (haveFound) {
-                if (convertedSize != argStr.size())
-                    syserr("Argument parsing error!");
-            }
-        }
-    }
+    void parse(int argc, char **argv);
 
-    ServerData build() const {
+    [[nodiscard]] ServerData build() const {
         return ServerData(width, height, turiningSpeed, portNum, seed, roundsPerSec);
     }
 };
 
 
+class ClientData {
+    std::string serverAddress;
+    std::string playerName;
+    uint16_t serverPortNum;
+    std::string guiAddress;
+    uint16_t guiPortNum;
+public:
+    ClientData(const std::string &serverAddress, const std::string &playerName, uint16_t serverPortNum,
+               const std::string &guiAddress, uint16_t guiPortNum) : serverAddress(serverAddress),
+                                                                     playerName(playerName),
+                                                                     serverPortNum(serverPortNum),
+                                                                     guiAddress(guiAddress), guiPortNum(guiPortNum) {}
+
+
+    friend std::ostream &operator<<(std::ostream &os, const ClientData &data) {
+        os << "serverAddress: " << data.serverAddress << " playerName: " << data.playerName << " serverPortNum: "
+           << data.serverPortNum << " guiAddress: " << data.guiAddress << " guiPortNum: " << data.guiPortNum;
+        return os;
+    }
+
+    [[nodiscard]] const std::string &getServerAddress() const {
+        return serverAddress;
+    }
+
+    [[nodiscard]] const std::string &getPlayerName() const {
+        return playerName;
+    }
+
+    [[nodiscard]] uint16_t getServerPortNum() const {
+        return serverPortNum;
+    }
+
+    [[nodiscard]] const std::string &getGuiAddress() const {
+        return guiAddress;
+    }
+
+    [[nodiscard]] uint16_t getGuiPortNum() const {
+        return guiPortNum;
+    }
+};
+
+
+class ClientDataBuilder {
+    std::string serverAddress;
+    std::string playerName;
+    uint16_t serverPortNum;
+    std::string guiAddress;
+    uint16_t guiPortNum;
+    uint32_t next_expected_event_no;
+public:
+    ClientDataBuilder() {
+        serverAddress = "";
+        playerName = "";
+        serverPortNum = Utils::DEFAULT_SERVER_PORT_NUM;
+        guiAddress = Utils::DEFAULT_GUI_SERVER_NAME;
+        guiPortNum = Utils::DEFAULT_GUI_PORT_NUM;
+    }
+
+    void parse(int argc, char **argv);
+
+    ClientData build() const {
+        return ClientData(serverAddress, playerName, serverPortNum, guiAddress, guiPortNum);
+    }
+};
 #endif //ZADANIE_2_DATABUILDERS_H

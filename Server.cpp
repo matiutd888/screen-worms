@@ -257,7 +257,6 @@ void Server::readFromClients(sockaddr_storage &clientAddr, ReadPacket &packet) {
 
 
     if (numBytes < 0) {
-        packet.errorOccured();
         debug_out_1 << TAG << "ERROR READING FROM CLIENT " << std::endl;
         throw Packet::FatalDecodingException();
     }

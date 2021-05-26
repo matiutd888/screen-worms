@@ -94,9 +94,6 @@ public:
         isOK = true;
         offset = 0;
     }
-    void errorOccured() {
-        isOK = false;
-    }
 
     char *getBuffer() {
         return buffer;
@@ -115,16 +112,12 @@ public:
     }
 
     void readData(void *dst, size_t dataSize) {
-//        std::cout << TAG << "Reading " << dataSize << " bytes from packet of size " << size << " and offset " << offset << std::endl;
         if (getRemainingSize() < dataSize)
             throw Packet::FatalDecodingException();
         memcpy(dst, buffer + offset, dataSize);
         offset += dataSize;
     }
 
-    bool isok() const {
-        return isOK;
-    }
     size_t getOffset() const {
         return offset;
     }

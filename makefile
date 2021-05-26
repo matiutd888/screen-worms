@@ -1,16 +1,21 @@
-OBJS	= serwer.o Server.o Connection.o DataBuilders.o Game.o PollUtils.o Packet.o Messages.o Random.o err.o
-SOURCE	= serwer.cpp Server.cpp Connection.c DataBuilders.cpp Game.cpp Messages.cpp PollUtils.cpp Packet.cpp Random.cpp err.cpp
+OBJS	= Server.o Connection.o DataBuilders.o Game.o PollUtils.o Packet.o Messages.o Random.o err.o
+SOURCE	= serwer.cpp Server.cpp Connection.c DataBuilders.cpp Game.cpp Messages.	cpp PollUtils.cpp Packet.cpp Random.cpp err.cpp
 HEADER	= Server.h Connection.h DataBuilders.h Game.h PollUtils.h Packet.h Messages.h Random.h Utils.h err.h
-OUT	= screen-worms-server
+OUT	= screen-worms-server screen-worms-client
 CC	 = g++
 FLAGS	 = -Wall -std=c++17 -c
 LFLAGS	 =
 
-all: $(OBJS)
-	$(CC) -g $(OBJS) -o $(OUT) $(LFLAGS)
+screen-worms-client: $(OBJS) client.o
+	$(CC) -g $(OBJS) client.o -o screen-worms-client$(LFLAGS)
+screen-worms-server: $(OBJS) serwer.o
+	$(CC) -g $(OBJS) serwer.o -o screen-worms-server $(LFLAGS)
 
 serwer.o: serwer.cpp Server.o DataBuilders.o Utils.h Messages.o
 	$(CC) $(FLAGS) serwer.cpp
+
+client.o: client.cpp Connection.o
+	$(CC) $(FLAGS) client.cpp
 
 #include "err.h"
 #include "PollUtils.h"
@@ -56,4 +61,4 @@ err.o: err.cpp err.h
 
 
 clean:
-	rm -f $(OBJS) $(OUT)
+	rm -f *.o $(OUT)

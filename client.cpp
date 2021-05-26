@@ -4,6 +4,7 @@
 
 #include <ostream>
 #include "Connection.h"
+#include "DataBuilders.h"
 #include <ext/stdio_filebuf.h>
 #include <netinet/tcp.h>
 #include <chrono>
@@ -15,47 +16,6 @@
 //-p n – port serwera gry (domyślne 2021)
 //-i gui_server – adres (IPv4 lub IPv6) lub nazwa serwera obsługującego interfejs użytkownika (domyślnie localhost)
 //-r n – port serwera obsługującego interfejs użytkownika (domyślnie 20210)
-
-class ClientData {
-    std::string serverAddress;
-    std::string playerName;
-    uint16_t serverPortNum;
-    std::string guiAddress;
-    uint16_t guiPortNum;
-public:
-    ClientData(const std::string &serverAddress, const std::string &playerName, uint16_t serverPortNum,
-               const std::string &guiAddress, uint16_t guiPortNum) : serverAddress(serverAddress),
-                                                                     playerName(playerName),
-                                                                     serverPortNum(serverPortNum),
-                                                                     guiAddress(guiAddress), guiPortNum(guiPortNum) {}
-
-
-    friend std::ostream &operator<<(std::ostream &os, const ClientData &data) {
-        os << "serverAddress: " << data.serverAddress << " playerName: " << data.playerName << " serverPortNum: "
-           << data.serverPortNum << " guiAddress: " << data.guiAddress << " guiPortNum: " << data.guiPortNum;
-        return os;
-    }
-
-    [[nodiscard]] const std::string &getServerAddress() const {
-        return serverAddress;
-    }
-
-    [[nodiscard]] const std::string &getPlayerName() const {
-        return playerName;
-    }
-
-    [[nodiscard]] uint16_t getServerPortNum() const {
-        return serverPortNum;
-    }
-
-    [[nodiscard]] const std::string &getGuiAddress() const {
-        return guiAddress;
-    }
-
-    [[nodiscard]] uint16_t getGuiPortNum() const {
-        return guiPortNum;
-    }
-};
 
 enum GUIMessage {
     LEFT_KEY_DOWN,
@@ -85,63 +45,6 @@ inline GUIMessage getGuiMessage(const std::string &guiMsgStr) {
     }
     throw std::invalid_argument("No GUI Message matching!");
 }
-
-class ClientDataBuilder {
-    std::string serverAddress;
-    std::string playerName;
-    uint16_t serverPortNum;
-    std::string guiAddress;
-    uint16_t guiPortNum;
-    uint32_t next_expected_event_no;
-public:
-    ClientDataBuilder() {
-        serverAddress = "";
-        playerName = "";
-        serverPortNum = Utils::DEFAULT_SERVER_PORT_NUM;
-        guiAddress = Utils::DEFAULT_GUI_SERVER_NAME;
-        guiPortNum = Utils::DEFAULT_GUI_PORT_NUM;
-    }
-
-    void parse(int argc, char **argv) {
-        char c;
-        if (argc < 2)
-            syserr("Client usage: game_server [-n player_name] [-p n] [-i gui_server] [-r n]");
-        serverAddress = argv[1];
-        optind = 2;
-        while ((c = getopt(argc, argv, "n:p:i:r:")) != -1) {
-            // TODO wywalać się jak nie poda
-            std::string argStr(optarg);
-            size_t convertedSize = 0;
-            printf("%c\n", c);
-            bool haveFoundNumber = false;
-            switch (c) {
-                case 'n':
-                    playerName = argStr;
-                    break;
-                case 'p':
-                    serverPortNum = std::stoi(argStr, &convertedSize);
-                    haveFoundNumber = true;
-                    break;
-                case 'i':
-                    guiAddress = argStr;
-                    break;
-                case 'r':
-                    guiPortNum = std::stoi(argStr, &convertedSize);
-                    haveFoundNumber = true;
-                    break;
-                default:;
-            }
-            if (haveFoundNumber) {
-                if (convertedSize != argStr.size())
-                    syserr("Argument parsing error!");
-            }
-        }
-    }
-
-    ClientData build() const {
-        return ClientData(serverAddress, playerName, serverPortNum, guiAddress, guiPortNum);
-    }
-};
 
 class ClientSide {
     ClientData data;
@@ -252,25 +155,16 @@ class ClientSide {
 
 public:
 //
-    ClientSide(const ClientData &clientData) : data(clientData),
+    explicit ClientSide(const ClientData &clientData) : data(clientData),
                                                guiSock(data.getGuiPortNum(), data.getGuiAddress().c_str()),
                                                sock(data.getServerPortNum(), data.getServerAddress().c_str()),
                                                pollClient(sock.getSocket(), guiSock.getSocket()),
                                                lastGuiMessage(NO_MSG), direction(TurnDirection::STRAIGHT),
                                                isInGame(false),
                                                sessionID(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                       std::chrono::system_clock::now().time_since_epoch()
-                                               ).count()) {
+                                                       std::chrono::system_clock::now().time_since_epoch()).count()) {
         std::cout << "constructed clientside!\n";
     }
-
-//    ClientSide(const ClientData &clientData) : data(clientData),
-//                                               sock(data.getServerPortNum(), data.getServerAddress().c_str()),
-//
-//                                               pollClient(sock.getSocket(), 0) {
-//
-//    }
-
 
     void sendLineToGUI(const std::string &line) {
         std::cout << "SENDING LINE TO GUI: " << line << std::endl;
@@ -278,10 +172,6 @@ public:
         send(pollClient.getDescriptor(PollClient::MESSAGE_GUI), lineWithNewLine.c_str(), lineWithNewLine.size(), 0);
     }
 
-//    void appendWithoutNullSign(std::string &line, const std::string &strToAppend) {
-//        for(int i = 0; i < strToAppend.size(); i++)
-//            line.push_back()
-//    }
     void tryToReadNewGame(ReadPacket &packet, uint32_t rcvdGameId) {
         Record record = Record::decode(packet);
         if (record.getEventType() != ServerEventType::NEW_GAME) {
@@ -343,14 +233,14 @@ public:
                 ClientMessage clientMessage(sessionID, static_cast<uint8_t>(direction), nextExpectedEventNo,
                                             data.getPlayerName().c_str(), data.getPlayerName().size());
 //                std::cout << "ASKING FOR " << nextExpectedEventNo << "isInGame = " << isInGame << std::endl;
-                 debug_out_1 << clientMessage << std::endl;
+//                 debug_out_1 << clientMessage << std::endl;
                 WritePacket writePacket;
                 clientMessage.encode(writePacket);
                 sendto(sock.getSocket(), writePacket.getBufferConst(), writePacket.getOffset(), 0,
                        sock.getAddrInfo().ai_addr, sock.getAddrInfo().ai_addrlen);
             }
             if (pollClient.hasPollinOccurred(PollClient::MESSAGE_SERVER)) {
-                std::cout << "Message server!" << std::endl;
+                debug_out_1 << "Message server!" << std::endl;
                 ReadPacket readPacket;
                 sockaddr_storage sockaddrStorage;
                 socklen_t addrLen;

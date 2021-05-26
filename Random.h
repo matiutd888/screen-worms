@@ -16,10 +16,5 @@ public:
         r = seed;
     };
 
-    uint32_t generate() {
-        uint32_t ret = r;
-        uint64_t calc = r * MULTIPLY_CONST;
-        r = calc % MODULO_CONST;
-        return ret;
-    }
+    uint32_t generate();
 };
