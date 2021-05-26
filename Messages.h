@@ -111,7 +111,6 @@ public:
         uint32_t index;
         for (size_t i = 0; i < bufsize; i++) {
             index = (crc ^ crcTable()[i]) & 0xFF;
-            std::cout << "index = " << index << std::endl;
             crc = (crc >> 8) ^ crcTable()[index];
         }
         return crc ^ 0xffffffff;

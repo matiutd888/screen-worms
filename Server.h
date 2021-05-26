@@ -33,7 +33,8 @@ class ClientManager {
     std::vector<Record> gameRecords;
     Random random;
     static constexpr int PLAYER_INDEX = 0;
-    static constexpr int TICKS_INDEX = 1;
+    static constexpr int TICKS_INDEX = 1; // Instead of pair, initially i wanted to store a
+    // tuple, thats why i hardcoded the indexes.
     static constexpr int NEXT_EXPECTED_EVENT_NO = 2;
  //   std::queue<WritePacket> packetsToSend;
     inline static const std::string TAG = "Client Manager: ";
@@ -76,12 +77,13 @@ public:
             }
         }
     }
-
+    // TODO naprawić ten błąd
     void addTicksAndCleanInactive() {
         for (auto it = clients.begin(), next_it = it; it != clients.end(); it = next_it) {
             ++next_it;
             auto &valIt = it->second;
-            if (std::get<TICKS_INDEX>(valIt) == 2) {
+            std::get<TICKS_INDEX>(valIt)++;
+            if (std::get<TICKS_INDEX>(valIt) >= 2) {
                 debug_out_1 << "TICKS: Erasing client " << it->first << std::endl;
                 removeClient(it);
                 debug_out_1 << "TICKS: Clients size after = " << clients.size() << std::endl;
@@ -140,6 +142,7 @@ public:
     }
 
     void removeClient(const std::map<Client, clientValue_t>::iterator &iterator) {
+        std::cout << "REMOVING CLIENT " << std::endl;
         const Client &client = iterator->first;
         const Player &player = std::get<PLAYER_INDEX>(iterator->second);
         if (!player.isObserver())
@@ -148,6 +151,7 @@ public:
             if (player.isPlayerReady())
                 countReadyPlayers--;
         }
+        std::cout << "BEFORE: Clients.count = " << clients.size() << " not observers =  " << countNotObservers << " not ready players = " << countReadyPlayers << std::endl;
         clients.erase(iterator);
     }
 
@@ -331,6 +335,11 @@ public:
                 manager.addTicksAndCleanInactive();
                 readTimeout(pollServer.getDescriptor(PollServer::TIMEOUT_CLIENT));
             }
+            // TODO włączanie serwera po kolei go psuje :(
+            // Konkretnie taka kolejność:
+            // 1. klient1
+            // 2. serwer
+            // 3. klient2
             if (pollServer.hasPollinOccurred(PollServer::MESSAGE_CLIENT)) {
                 // debug_out_1 << TAG << "Client message!" << std::endl;
                 try {
