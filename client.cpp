@@ -343,7 +343,7 @@ public:
                 ClientMessage clientMessage(sessionID, static_cast<uint8_t>(direction), nextExpectedEventNo,
                                             data.getPlayerName().c_str(), data.getPlayerName().size());
 //                std::cout << "ASKING FOR " << nextExpectedEventNo << "isInGame = " << isInGame << std::endl;
-                // std::cout << clientMessage << std::endl;
+                 debug_out_1 << clientMessage << std::endl;
                 WritePacket writePacket;
                 clientMessage.encode(writePacket);
                 sendto(sock.getSocket(), writePacket.getBufferConst(), writePacket.getOffset(), 0,

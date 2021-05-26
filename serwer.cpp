@@ -2,9 +2,7 @@
 // Created by mateusz on 19.05.2021.
 //
 
-#include "Connection.h"
 #include "Utils.h"
-#include "err.h"
 #include "DataBuilders.h"
 #include "Server.h"
 
@@ -19,8 +17,6 @@
 //(parametr `ROUNDS_PER_SEC` w opisie protokołu, domyślnie `50`)
 //* `-w n` – szerokość planszy w pikselach (domyślnie `640`)
 //* `-h n` – wysokość planszy w pikselach (domyślnie `480`)
-
-
 int main(int argc, char **argv) {
     ServerDataBuilder builder;
     builder.parse(argc, argv);
