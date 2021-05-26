@@ -6,6 +6,8 @@ CC	 = g++
 FLAGS	 = -Wall -std=c++17 -c
 LFLAGS	 =
 
+all: screen-worms-client screen-worms-server
+
 screen-worms-client: $(OBJS) client.o
 	$(CC) -g $(OBJS) client.o -o screen-worms-client$(LFLAGS)
 screen-worms-server: $(OBJS) serwer.o
