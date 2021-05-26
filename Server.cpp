@@ -245,7 +245,7 @@ void Server::readTimeout(int fd) {
 }
 
 void Server::readFromClients(sockaddr_storage &clientAddr, ReadPacket &packet) {
-
+    std::cout << "READ FROM CLIENTS!" << std::endl;
     socklen_t clientAddrLen = sizeof(clientAddr);
 
     ssize_t numBytes = recvfrom(pollServer.getDescriptor(PollServer::MESSAGE_CLIENT),
