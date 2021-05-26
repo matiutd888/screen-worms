@@ -152,7 +152,7 @@ class ClientSide {
     GUIMessage lastGuiMessage;
     bool isInGame = false;
     uint32_t currGameId;
-    uint32_t nextExpectedEventNo = 0;
+    uint32_t nextExpectedEventNo;
     std::vector<std::string> players;
     uint64_t sessionID;
 
@@ -194,7 +194,7 @@ class ClientSide {
     }
 
     void handleGameOver() {
-        std::cout << "RECEIVED GAME OVER " << std::endl;
+        std::cout << "RECEIVED GAME OVER: nextExpectedEventNo = " << nextExpectedEventNo << std::endl;
         nextExpectedEventNo = 0;
         isInGame = false;
         currGameId = 0;
@@ -240,6 +240,7 @@ class ClientSide {
         nextExpectedEventNo++;
         if (eventType == ServerEventType::GAME_OVER) {
             handleGameOver();
+            return;
         }
         if (eventType == ServerEventType::PLAYER_ELIMINATED) {
             handlePlayerEliminated(record);
@@ -285,7 +286,6 @@ public:
         if (record.getEventType() != ServerEventType::NEW_GAME) {
             debug_out_0 << "Excpected New game but didnt receive it" << std::endl;
             throw EventData::InvalidTypeException();
-            return;
         }
         debug_out_0 << "Received new Game " << std::endl;
         if (record.getEventNo() != 0) {
@@ -308,6 +308,7 @@ public:
         }
         sendLineToGUI(newGameString);
         isInGame = true;
+        debug_out_1 << "WILL NOW BE READING ONLY " << rcvdGameId << " comunicates!\n";
         currGameId = rcvdGameId;
         nextExpectedEventNo = 1;
     }
@@ -356,7 +357,7 @@ public:
                             tryToReadNewGame(readPacket, rcvdGameID);
                         }
                         size_t initialOffset = readPacket.getOffset();
-                        while (readPacket.getRemainingSize() > 0) {
+                        while (readPacket.getRemainingSize() > 0 && isInGame) {
                             Record record = Record::decode(readPacket);
                             handleGameRecord(record);
                             if (!record.checkCrcOk(readPacket, initialOffset)) {
@@ -379,6 +380,7 @@ public:
                 // std::cout << "Sending message to server!" << std::endl;
                 ClientMessage clientMessage(sessionID, static_cast<uint8_t>(direction), nextExpectedEventNo,
                                             data.getPlayerName().c_str(), data.getPlayerName().size());
+//                std::cout << "ASKING FOR " << nextExpectedEventNo << std::endl;
                 // std::cout << clientMessage << std::endl;
                 WritePacket writePacket;
                 clientMessage.encode(writePacket);

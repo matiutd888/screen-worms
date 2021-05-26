@@ -24,6 +24,45 @@
 // TODO zastanowić się nad tym Round Robin
 // Wymagałoby to tak naprawdę tylko iteratora...
 // Myślę że do zrobienia, ale potem.
+class MsgQueue {
+    static constexpr int CLIENTS_SIZE = 25;
+    static constexpr int NO_EVENT = -1;
+    Client clients[CLIENTS_SIZE];
+    int64_t expectedEventNo[CLIENTS_SIZE];
+    size_t nextClientIndex;
+
+public:
+    MsgQueue() {
+        nextClientIndex = 0;
+        for (int i = 0; i < CLIENTS_SIZE; ++i) {
+            expectedEventNo[i] = NO_EVENT;
+        }
+    }
+
+    void advanceClientIndex() {
+        nextClientIndex++;
+        nextClientIndex %= CLIENTS_SIZE;
+    }
+
+    bool addClient(Client client, uint32_t nextExpectedEventNo) {
+        for (int i = 0; i < CLIENTS_SIZE; ++i) {
+            if (expectedEventNo[i] == NO_EVENT) {
+                debug_out_0 << "QUEUE: " << "adding client " << client << " nextExpectedEventNo" << nextExpectedEventNo << std::endl;
+                expectedEventNo[i] = nextExpectedEventNo;
+                clients[i] = client;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool hasMessages() {
+        for(int i = 0; i < CLIENTS_SIZE; i++) {
+
+        }
+    }
+};
+
 class ClientManager {
     using clientValue_t = std::pair<Player, int>;
     std::map<Client, clientValue_t> clients;
@@ -36,12 +75,13 @@ class ClientManager {
     static constexpr int TICKS_INDEX = 1; // Instead of pair, initially i wanted to store a
     // tuple, thats why i hardcoded the indexes.
     static constexpr int NEXT_EXPECTED_EVENT_NO = 2;
- //   std::queue<WritePacket> packetsToSend;
+    //   std::queue<WritePacket> packetsToSend;
     inline static const std::string TAG = "Client Manager: ";
     std::queue<std::pair<Client, WritePacket>> packetsToSend;
 public:
     ClientManager(uint32_t width, uint32_t height, int turningSpeed, uint32_t seed) : game(width, height, turningSpeed),
-                                                                       countReadyPlayers(0), countNotObservers(0),
+                                                                                      countReadyPlayers(0),
+                                                                                      countNotObservers(0),
                                                                                       random(seed) {};
 
     [[nodiscard]] std::vector<Record> getRecords(uint32_t next_expected_event_no) const {
@@ -53,13 +93,20 @@ public:
     [[nodiscard]] std::vector<WritePacket> constructPackets(const std::vector<Record> &records) const {
         size_t it = 0;
         std::vector<WritePacket> packets;
+        std::cout << "PUSHING PACKETS WITH gameID = " << game.getGameId() << std::endl;
         while (it < records.size()) {
             WritePacket packet;
             ServerMessage::startServerMessage(packet, game.getGameId());
             bool fits = true;
             while (fits && it < records.size()) {
                 try {
+                    if (records[it].getEventType() == ServerEventType::NEW_GAME) {
+                        debug_out_1 << "NEW GAME PUSHED WITH GAMEID = " << game.getGameId() << std::endl;
+                    }
                     records[it].encode(packet);
+                    if (records[it].getEventType() == ServerEventType::NEW_GAME) {
+                        debug_out_1 << "NEW GAME PUSHED SUCCESSFULLY!" << std::endl;
+                    }
                     it++;
                 } catch (const Packet::PacketToSmallException &p) {
                     fits = false;
@@ -77,7 +124,7 @@ public:
             }
         }
     }
-    // TODO naprawić ten błąd
+
     void addTicksAndCleanInactive() {
         for (auto it = clients.begin(), next_it = it; it != clients.end(); it = next_it) {
             ++next_it;
@@ -96,7 +143,7 @@ public:
     }
 
     bool canGameStart() const {
-        std::cout << "cout not observers " << countNotObservers << " count ready players" << countReadyPlayers << std::endl;
+//        std::cout << "cout not observers " << countNotObservers << " count ready players" << countReadyPlayers << std::endl;
         return !game.isGameNow() && countReadyPlayers == countNotObservers && countNotObservers >= 2;
     }
 
@@ -114,7 +161,7 @@ public:
     // 4. Check for game start.
 
     bool isNameUnique(const std::string &name, const Client &c) {
-        for(const auto &it : clients) {
+        for (const auto &it : clients) {
             if (it.second.first.getName() == name && !(it.first == c))
                 return false;
         }
@@ -129,14 +176,16 @@ public:
         Player player(newMsg.getStringPlayerName(), static_cast<TurnDirection>(newMsg.getTurnDirection()),
                       newMsg.getSessionId());
 
-
+        std::cout << "ADDING CLIENT " << client << " , player = " << player << std::endl;
         if (!player.isObserver()) {
             countNotObservers++;
             if (!game.isGameNow()) {
-                if (player.isPlayerReady())
+                if (player.isPlayerReady()) {
                     countReadyPlayers++;
+                }
             }
         }
+        std::cout << "NOT OBSERVERS = " << countNotObservers << ",  countReadyPlayers = " << countReadyPlayers << std::endl;
         clients[client] = std::make_pair(player, 0);
         pushClientMessagesOnQueue(client, newMsg.getNextExpectedEventNo());
     }
@@ -151,7 +200,8 @@ public:
             if (player.isPlayerReady())
                 countReadyPlayers--;
         }
-        std::cout << "BEFORE: Clients.count = " << clients.size() << " not observers =  " << countNotObservers << " not ready players = " << countReadyPlayers << std::endl;
+        std::cout << "BEFORE: Clients.count = " << clients.size() << " not observers =  " << countNotObservers
+                  << " not ready players = " << countReadyPlayers << std::endl;
         clients.erase(iterator);
     }
 
@@ -160,7 +210,7 @@ public:
         if (records.empty())
             return;
         auto packets = constructPackets(records);
-        for(const auto &packet : packets) {
+        for (const auto &packet : packets) {
             packetsToSend.push(std::make_pair(client, packet));
         }
     }
@@ -176,11 +226,14 @@ public:
             bool after = player.isPlayerReady();
             if (!before && after) {
                 countReadyPlayers++;
+                std::cout << "PLAYER BECAME READY: " << player << " COUNT READY PLAYERS = " << countReadyPlayers << std::endl;
             }
         }
         std::get<TICKS_INDEX>(val) = 0;
+        if (gameRecords.size() > message.getNextExpectedEventNo())
+            std::cout << "pushing [" << message.getNextExpectedEventNo() << ", " << gameRecords.size() << ") for client "
+                      << client << ", player = " << player << std::endl;
         pushClientMessagesOnQueue(client, message.getNextExpectedEventNo());
-
 //        std::get<NEXT_EXPECTED_EVENT_NO>(val) = message.getNextExpectedEventNo();
     }
 
@@ -233,7 +286,8 @@ public:
                 gamePlayers.push_back(clientVal.first);
             }
         }
-        debug_out_0 << TAG << "Starting new game with " << countReadyPlayers << " ready players and " << clients.size() - countNotObservers << " observers\n";
+        debug_out_0 << TAG << "Starting new game with " << countReadyPlayers << " ready players and "
+                    << clients.size() - countNotObservers << " observers\n";
         std::vector<Record> records = game.startNewGame(gamePlayers, random);
         for (auto &r: records) {
             gameRecords.push_back(r);
@@ -247,6 +301,7 @@ public:
         packetsToSend.pop();
         return top;
     }
+
     void endGame() {
         debug_out_0 << TAG << " Ending game! " << std::endl;
         for (auto &it : clients) {
@@ -255,8 +310,13 @@ public:
         gameRecords.clear();
         countReadyPlayers = 0;
     }
+
     void performRound() {
-        pushPacketsForAll(constructPackets(game.doRound()));
+        auto records = game.doRound();
+        for (auto &r_it : records) {
+            gameRecords.push_back(r_it);
+        }
+        pushPacketsForAll(constructPackets(records));
         if (!game.isGameNow()) {
             endGame();
         }
@@ -301,18 +361,21 @@ class Server {
 
     void sendPacketToClient(const Client &client, const WritePacket &writePacket) const {
         const struct sockaddr_storage *sockaddrStorage = &client.getSockaddrStorage();
-        if (sendto(pollServer.getDescriptor(PollServer::MESSAGE_CLIENT), writePacket.getBufferConst(), writePacket.getOffset(), 0,
-               reinterpret_cast<const sockaddr *>(sockaddrStorage),
-               sizeof(client.getSockaddrStorage())) == -1) {
+        if (sendto(pollServer.getDescriptor(PollServer::MESSAGE_CLIENT), writePacket.getBufferConst(),
+                   writePacket.getOffset(), 0,
+                   reinterpret_cast<const sockaddr *>(sockaddrStorage),
+                   sizeof(client.getSockaddrStorage())) == -1) {
             syserr("error sending udp packet!");
         }
     }
+
 public:
     explicit Server(const ServerData &serverData) : serverData(serverData),
-                                           manager(serverData.getWidth(), serverData.getHeight(),
-                                                   serverData.getTuriningSpeed(), serverData.getSeed()),
-                                           clientSocket(serverData.getPortNum()),
-                                           pollServer(clientSocket.getSocket(), serverData.getRoundsPerSec()) {}
+                                                    manager(serverData.getWidth(), serverData.getHeight(),
+                                                            serverData.getTuriningSpeed(), serverData.getSeed()),
+                                                    clientSocket(serverData.getPortNum()),
+                                                    pollServer(clientSocket.getSocket(),
+                                                               serverData.getRoundsPerSec()) {}
 
     [[noreturn]] void start() {
         while (true) {
@@ -355,13 +418,14 @@ public:
                             manager.startGame();
                             auto r = manager.getRecords(0);
                             std::cout << "NEW GAME EVENTS " << std::endl;
-                            for(auto &r_it : r) {
-                                std::cout << "EVENT " << r_it.getEventNo() << ", " << r_it.getEventData()->getType() << std::endl;
+                            for (auto &r_it : r) {
+                                std::cout << "EVENT " << r_it.getEventNo() << ", " << r_it.getEventData()->getType()
+                                          << std::endl;
                             }
                             manager.pushPacketsForAll(manager.constructPackets(r));
                             std::cout << "pusing packets done!" << std::endl;
-                        } else {
-                            debug_out_1 << "Game cannot start!" << std::endl;
+                        } else { ;
+//                            debug_out_1 << "Game cannot start!" << std::endl;
                         }
                     }
                 } catch (const Packet::PacketToSmallException &p) {

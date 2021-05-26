@@ -188,6 +188,7 @@ class Client {
     std::string ipAddress;
     IPaddressType ipType;
     struct sockaddr_storage sockaddrStorage;
+
 public:
     // We do not compare session ID.
     bool operator<(const Client &rhs) const {

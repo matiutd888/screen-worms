@@ -463,17 +463,18 @@ public:
     }
 
     void encode(WritePacket &packet) const {
-        std::cout << "Encoding Record: " << std::endl;
+        std::cout << "Encoding record: type = " << eventData->getType() <<" eventNo = " << eventNo << std::endl;
+//        std::cout << "Encoding Record: " << std::endl;
         if (getSize() > packet.getRemainingSize())
             throw Packet::PacketToSmallException();
         uint32_t sizeNoCRC32 = getSize() - sizeof(crc32_t);
         size_t initialOffset = packet.getOffset();
-        std::cout << "Initial offset " << initialOffset << std::endl;
-        std::cout << "Len = " << len << std::endl;
+//        std::cout << "Initial offset " << initialOffset << std::endl;
+//        std::cout << "Len = " << len << std::endl;
         write32ToPacket(packet, len);
-        std::cout << "eventNo = " << eventNo << std::endl;
+//        std::cout << "eventNo = " << eventNo << std::endl;
         write32ToPacket(packet, eventNo);
-        std::cout << "eventDataType = " << eventData->getType() << std::endl;
+//        std::cout << "eventDataType = " << eventData->getType() << std::endl;
         eventData->encode(packet);
         uint32_t m_crc32 = CrcMaker::genCRC(packet.getBufferWithOffsetConst(initialOffset), sizeNoCRC32);
 //        uint32_t m_crc32 = 0;
@@ -481,20 +482,20 @@ public:
     }
 
     static Record decode(ReadPacket &packet) {
-        std::cout << "DECODING PACKET, size = " << packet.getRemainingSize() << std::endl;
+//        std::cout << "DECODING PACKET, size = " << packet.getRemainingSize() << std::endl;
         // We want to read len first.
         if (sizeof(uint32_t) > packet.getRemainingSize())
             throw Packet::PacketToSmallException();
         Record record;
         read32FromPacket(packet, record.len);
-        std::cout << "Received len = " << record.len << std::endl;
+//        std::cout << "Received len = " << record.len << std::endl;
         if (record.len + sizeof(crc32_t) > packet.getRemainingSize())
             throw Packet::PacketToSmallException();
         read32FromPacket(packet, record.eventNo);
-        std::cout << "Received eventNo = " << record.eventNo << std::endl;
+//        std::cout << "Received eventNo = " << record.eventNo << std::endl;
         uint8_t event_type;
         packet.readData(&event_type, sizeof(uint8_t));
-        std::cout << "Received eventType = " << event_type << std::endl;
+        std::cout << "Decoding record: eventType = " << event_type << " eventNo = " << record.eventNo << std::endl;
         if (event_type > max_event_type)
             throw Packet::FatalDecodingException();
         auto eventType = static_cast<ServerEventType>(event_type);
@@ -536,6 +537,7 @@ public:
 class ServerMessage {
 public:
     static void startServerMessage(WritePacket &packet, uint32_t gameId) {
+        std::cout << "SERVER MESSAGE: writing " << gameId << " to packet!" << std::endl;
         if (packet.getRemainingSize() < sizeof(gameId))
             throw Packet::PacketToSmallException();
         write32ToPacket(packet, gameId);
@@ -545,6 +547,7 @@ public:
     static uint32_t getGameId(ReadPacket &packet) {
         uint32_t gameId;
         read32FromPacket(packet, gameId);
+        std::cout << "SERVER MESSAGE: read " << gameId << " from packet! " << std::endl;
         return gameId;
     }
 };

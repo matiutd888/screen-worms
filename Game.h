@@ -177,9 +177,11 @@ public:
         std::sort(gamePlayers.begin(), gamePlayers.end());
         std::vector<Record> records;
         gameID = random.generate();
+        std::cout << "GAME: " << " generated GAme ID = " << gameID << std::endl;
         eventCount = 0;
         auto newGameEvent = std::make_shared<NewGameData>(NewGameData(width, height,generateNamesVector(gamePlayers)));
         records.emplace_back(Record(eventCount++, newGameEvent));
+        std::cout << "GAME: GENERATING NEW_GAME, " << eventCount <<std::endl;
         for (size_t i = 0; i < gamePlayers.size(); i++) {
             std::cout << "Player " << i << gamePlayers[i] << std::endl;
             double x = (random.generate() % width) + 0.5;
@@ -190,6 +192,7 @@ public:
                 records.emplace_back(
                         Record(eventCount++, std::make_shared<PlayerEliminatedData>(PlayerEliminatedData(i))));
                 if (checkForGameEnd()) {
+                    std::cout << "GAME: " << "PUSHING GAME OVER! " << eventCount << std::endl;
                     records.emplace_back(
                             Record(eventCount++, std::make_shared<GameOver>(GameOver()))
                     );
@@ -228,10 +231,12 @@ public:
                         Record(eventCount++, std::make_shared<PlayerEliminatedData>(PlayerEliminatedData(it->second.first))));
                 activePlayers.erase(it);
                 if (checkForGameEnd()) {
+                    std::cout << "GAME: " << "PUSHING GAME OVER! " << eventCount << std::endl;
                     records.emplace_back(
                             Record(eventCount++, std::make_shared<GameOver>(GameOver()))
                             );
                     gameOver();
+
                     return records;
                 }
             } else {
