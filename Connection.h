@@ -20,7 +20,7 @@
 #include <netinet/tcp.h>
 
 enum IPaddressType {
-    IPv4 = 0, IPv6 = 1
+    NoIP = 0, IPv4 = 1, IPv6 = 2
 };
 
 class Socket {
@@ -100,7 +100,7 @@ public:
         }
         debug_out_1 << "UDP: Trying to loop through IPS" << std::endl;
         // loop through all the results and make a socket
-        for(p = servinfo; p != NULL; p = p->ai_next) {
+        for (p = servinfo; p != NULL; p = p->ai_next) {
             if ((sockfd = socket(p->ai_family, p->ai_socktype,
                                  p->ai_protocol)) == -1) {
                 perror("talker: socket");
@@ -144,7 +144,7 @@ public:
                 continue;
             }
 
-             https://stackoverflow.com/questions/31997648/where-do-i-set-tcp-nodelay-in-this-c-tcp-client
+            https://stackoverflow.com/questions/31997648/where-do-i-set-tcp-nodelay-in-this-c-tcp-client
             int yes = 1;
             int result = setsockopt(sockfd,
                                     IPPROTO_TCP,
@@ -213,11 +213,13 @@ public:
     }
 
     friend std::ostream &operator<<(std::ostream &os, const Client &client) {
-        os << " ipAddress: " << client.ipAddress  << "portNum: " << client.portNum;
+        os << " ipAddress: " << client.ipAddress << "portNum: " << client.portNum;
         return os;
     }
 
-    Client() = default;
+    Client() {
+        ipType = IPaddressType::NoIP;
+    };
 
     explicit Client(const struct sockaddr_storage &clientAddress) {
         sockaddrStorage = clientAddress;

@@ -30,18 +30,31 @@ class MsgQueue {
     Client clients[CLIENTS_SIZE];
     int64_t expectedEventNo[CLIENTS_SIZE];
     size_t nextClientIndex;
-
+    uint32_t eventsCount;
 public:
+    class NoClientWithMessagesException : std::exception {
+        const char * what() const noexcept override {
+            return "No Client with messages Exeption!";
+        }
+    };
+
+    class InvalidEventNoException : std::exception {
+        const char * what() const noexcept override {
+            return "Invalid event No!";
+        }
+    };
+
     MsgQueue() {
+        eventsCount = 0;
         nextClientIndex = 0;
         for (int i = 0; i < CLIENTS_SIZE; ++i) {
             expectedEventNo[i] = NO_EVENT;
         }
     }
 
-    void advanceClientIndex() {
-        nextClientIndex++;
-        nextClientIndex %= CLIENTS_SIZE;
+    static void advanceModulo(size_t &i) {
+        i++;
+        i %= CLIENTS_SIZE;
     }
 
     bool addClient(Client client, uint32_t nextExpectedEventNo) {
@@ -53,13 +66,88 @@ public:
                 return true;
             }
         }
+        debug_out_0 << "QUEUE: " << "Failed adding client!" << client << std::endl;
         return false;
     }
 
-    bool hasMessages() {
-        for(int i = 0; i < CLIENTS_SIZE; i++) {
+    bool hasMessages() const {
+        size_t it = nextClientIndex;
+        do {
+            if (expectedEventNo[it] != NO_EVENT && expectedEventNo[it] < eventsCount)
+                return true;
+            advanceModulo(it);
+        } while (it != nextClientIndex);
+        return false;
+    }
 
+    size_t getNextExpectedClientIndexAndAdvance() {
+        size_t beggining = nextClientIndex;
+        do {
+            if (expectedEventNo[nextClientIndex] != NO_EVENT && expectedEventNo[nextClientIndex] < eventsCount) {
+                size_t ret = nextClientIndex;
+                advanceModulo(nextClientIndex);
+                return ret;
+            }
+            advanceModulo(nextClientIndex);
+        } while (nextClientIndex != beggining);
+        throw NoClientWithMessagesException();
+    }
+
+    uint32_t getExpectedEventNo(size_t index) {
+        return expectedEventNo[index];
+    }
+
+    const Client &getClientByIndex(size_t index) {
+        if (index >= CLIENTS_SIZE)
+            throw std::invalid_argument("Invalid client index!");
+        if (expectedEventNo[index] == NO_EVENT)
+            throw std::invalid_argument("No client at this index!");
+        return clients[index];
+    }
+
+    void setEventsCount(uint32_t events) {
+        eventsCount = events;
+    }
+
+    void setExpectedEventsToZero() {
+        for (int i = 0; i < CLIENTS_SIZE; ++i) {
+            if (expectedEventNo[i] != NO_EVENT) {
+                expectedEventNo[i] = 0;
+            }
         }
+    }
+
+    void updateClient(const Client &client, uint32_t nextExpectedEventNo) {
+        if (nextExpectedEventNo > eventsCount) {
+            return;
+        }
+        for(int i = 0; i < CLIENTS_SIZE; i++) {
+            if (clients[i] == client) {
+                std::cout << "Client: " << client << " expected event no = " << nextExpectedEventNo << std::endl;
+                expectedEventNo[i] = nextExpectedEventNo;
+                return;
+            }
+        }
+        throw std::invalid_argument("No client found!\n");
+    }
+
+    void deleteClientFromQueue(const Client &client) {
+        for(size_t it = 0; it < CLIENTS_SIZE; it++) {
+            if (clients[it] == client) {
+                clients[it] = Client();
+                expectedEventNo[it] = NO_EVENT;
+            }
+        }
+    }
+
+    void setExpectedEventNo(size_t index, uint32_t value) {
+        if (value > eventsCount) {
+            throw InvalidEventNoException();
+        }
+        if (index >= CLIENTS_SIZE)
+            throw std::invalid_argument("Invalid client index!");
+
+        expectedEventNo[index] = value;
     }
 };
 
@@ -71,13 +159,15 @@ class ClientManager {
     Game game;
     std::vector<Record> gameRecords;
     Random random;
+    MsgQueue queue;
     static constexpr int PLAYER_INDEX = 0;
     static constexpr int TICKS_INDEX = 1; // Instead of pair, initially i wanted to store a
     // tuple, thats why i hardcoded the indexes.
     static constexpr int NEXT_EXPECTED_EVENT_NO = 2;
     //   std::queue<WritePacket> packetsToSend;
     inline static const std::string TAG = "Client Manager: ";
-    std::queue<std::pair<Client, WritePacket>> packetsToSend;
+//    std::queue<std::pair<Client, WritePacket>> packetsToSend;
+
 public:
     ClientManager(uint32_t width, uint32_t height, int turningSpeed, uint32_t seed) : game(width, height, turningSpeed),
                                                                                       countReadyPlayers(0),
@@ -117,12 +207,31 @@ public:
         return packets;
     }
 
-    void pushPacketsForAll(const std::vector<WritePacket> &packets) {
-        for (const auto &packet : packets) {
-            for (const auto &client: clients) {
-                packetsToSend.push(std::make_pair(client.first, packet));
+//    void pushPacketsForAll(const std::vector<WritePacket> &packets) {
+//        for (const auto &packet : packets) {
+//            for (const auto &client: clients) {
+//                packetsToSend.push(std::make_pair(client.first, packet));
+//            }
+//        }
+//    }
+
+    std::pair<WritePacket, Client> handleNextInQueue() {
+        size_t clientIndex = queue.getNextExpectedClientIndexAndAdvance();
+        uint32_t nextExpectedEventNo = queue.getExpectedEventNo(clientIndex);
+        Client client = queue.getClientByIndex(clientIndex);
+        WritePacket writePacket;
+        ServerMessage::startServerMessage(writePacket, game.getGameId());
+        uint32_t eventNoIt = nextExpectedEventNo;
+        while (eventNoIt < gameRecords.size() && writePacket.getRemainingSize() > gameRecords[eventNoIt].getSize()) {
+            try {
+                gameRecords[eventNoIt].encode(writePacket);
+                eventNoIt++;
+            } catch (const Packet::PacketToSmallException &p){
+                break;
             }
         }
+        queue.setExpectedEventNo(clientIndex, eventNoIt);
+        return {writePacket, client};
     }
 
     void addTicksAndCleanInactive() {
@@ -159,7 +268,6 @@ public:
     // 3.1 If its the same, update the player.
     // 3.2 If its different perform R and A.
     // 4. Check for game start.
-
     bool isNameUnique(const std::string &name, const Client &c) {
         for (const auto &it : clients) {
             if (it.second.first.getName() == name && !(it.first == c))
@@ -171,7 +279,7 @@ public:
     void addClient(const Client &client, const ClientMessage &newMsg) {
         // newMsg.
         if (!isNameUnique(newMsg.getStringPlayerName(), client))
-            throw std::invalid_argument("Invalid argument");
+            return;
 
         Player player(newMsg.getStringPlayerName(), static_cast<TurnDirection>(newMsg.getTurnDirection()),
                       newMsg.getSessionId());
@@ -187,7 +295,7 @@ public:
         }
         std::cout << "NOT OBSERVERS = " << countNotObservers << ",  countReadyPlayers = " << countReadyPlayers << std::endl;
         clients[client] = std::make_pair(player, 0);
-        pushClientMessagesOnQueue(client, newMsg.getNextExpectedEventNo());
+        queue.addClient(client, newMsg.getNextExpectedEventNo());
     }
 
     void removeClient(const std::map<Client, clientValue_t>::iterator &iterator) {
@@ -202,18 +310,19 @@ public:
         }
         std::cout << "BEFORE: Clients.count = " << clients.size() << " not observers =  " << countNotObservers
                   << " not ready players = " << countReadyPlayers << std::endl;
+        queue.deleteClientFromQueue(iterator->first);
         clients.erase(iterator);
     }
 
-    void pushClientMessagesOnQueue(const Client &client, uint32_t nextExpectedEventNo) {
-        auto records = getRecords(nextExpectedEventNo);
-        if (records.empty())
-            return;
-        auto packets = constructPackets(records);
-        for (const auto &packet : packets) {
-            packetsToSend.push(std::make_pair(client, packet));
-        }
-    }
+//    void pushClientMessagesOnQueue(const Client &client, uint32_t nextExpectedEventNo) {
+//        auto records = getRecords(nextExpectedEventNo);
+//        if (records.empty())
+//            return;
+//        auto packets = constructPackets(records);
+//        for (const auto &packet : packets) {
+//            packetsToSend.push(std::make_pair(client, packet));
+//        }
+//    }
 
     void updateClientPlayersInfo(const Client &client, clientValue_t &val, const ClientMessage &message) {
         Player &player = std::get<PLAYER_INDEX>(val);
@@ -230,11 +339,13 @@ public:
             }
         }
         std::get<TICKS_INDEX>(val) = 0;
-        if (gameRecords.size() > message.getNextExpectedEventNo())
-            std::cout << "pushing [" << message.getNextExpectedEventNo() << ", " << gameRecords.size() << ") for client "
-                      << client << ", player = " << player << std::endl;
-        pushClientMessagesOnQueue(client, message.getNextExpectedEventNo());
-//        std::get<NEXT_EXPECTED_EVENT_NO>(val) = message.getNextExpectedEventNo();
+        std::cout << "Updating client: " << client << " queue index!" << std::endl;
+        queue.updateClient(client, message.getNextExpectedEventNo());
+        //        if (gameRecords.size() > message.getNextExpectedEventNo())
+//            std::cout << "pushing [" << message.getNextExpectedEventNo() << ", " << gameRecords.size() << ") for client "
+//                      << client << ", player = " << player << std::endl;
+//
+        //        std::get<NEXT_EXPECTED_EVENT_NO>(val) = message.getNextExpectedEventNo();
     }
 
     void handleClient(Client &newClient, const ClientMessage &newMsg) {
@@ -274,10 +385,11 @@ public:
     }
 
     [[nodiscard]] bool hasMessages() const {
-        return !packetsToSend.empty();
+        return queue.hasMessages();
     }
 
     auto startGame() {
+        queue.setExpectedEventsToZero();
         gameRecords.clear();
         std::vector<Player> gamePlayers;
         for (const auto &it : clients) {
@@ -293,13 +405,8 @@ public:
             gameRecords.push_back(r);
         }
         debug_out_0 << TAG << "Game started succesfully " << std::endl;
+        queue.setEventsCount(gameRecords.size());
         return records;
-    }
-
-    std::pair<Client, WritePacket> packetsQueuePop() {
-        auto top = packetsToSend.front();
-        packetsToSend.pop();
-        return top;
     }
 
     void endGame() {
@@ -307,7 +414,7 @@ public:
         for (auto &it : clients) {
             it.second.first.setReady(false);
         }
-        gameRecords.clear();
+        // gameRecords.clear();
         countReadyPlayers = 0;
     }
 
@@ -316,10 +423,15 @@ public:
         for (auto &r_it : records) {
             gameRecords.push_back(r_it);
         }
-        pushPacketsForAll(constructPackets(records));
+        queue.setEventsCount(gameRecords.size());
+        //pushPacketsForAll(constructPackets(records));
         if (!game.isGameNow()) {
             endGame();
         }
+    }
+
+    MsgQueue& getQueue() {
+        return queue;
     }
 };
 
@@ -416,16 +528,14 @@ public:
                     if (!manager.getGame().isGameNow()) {
                         if (manager.canGameStart()) {
                             manager.startGame();
-                            auto r = manager.getRecords(0);
-                            std::cout << "NEW GAME EVENTS " << std::endl;
-                            for (auto &r_it : r) {
-                                std::cout << "EVENT " << r_it.getEventNo() << ", " << r_it.getEventData()->getType()
-                                          << std::endl;
-                            }
-                            manager.pushPacketsForAll(manager.constructPackets(r));
-                            std::cout << "pusing packets done!" << std::endl;
+//                            std::cout << "NEW GAME EVENTS " << std::endl;
+//                            for (auto &r_it : r) {
+//                                std::cout << "EVENT " << r_it.getEventNo() << ", " << r_it.getEventData()->getType()
+//                                          << std::endl;
+//                            }
+//                            std::cout << "pusing packets done!" << std::endl;
                         } else { ;
-//                            debug_out_1 << "Game cannot start!" << std::endl;
+                            debug_out_1 << "Game cannot start!" << std::endl;
                         }
                     }
                 } catch (const Packet::PacketToSmallException &p) {
@@ -433,9 +543,9 @@ public:
                     continue;
                 }
             }
-            if (pollServer.hasPolloutOccurred(PollServer::MESSAGE_CLIENT)) {
-                auto packetToSend = manager.packetsQueuePop();
-                sendPacketToClient(packetToSend.first, packetToSend.second);
+            if (pollServer.hasPolloutOccurred(PollServer::MESSAGE_CLIENT) && manager.hasMessages()) {
+                auto packetToSend = manager.handleNextInQueue();
+                sendPacketToClient(packetToSend.second, packetToSend.first);
                 pollServer.removePolloutFromEvents(PollServer::MESSAGE_CLIENT);
 //                debug_out_1 << "Removing pollout " << std::endl;
             }

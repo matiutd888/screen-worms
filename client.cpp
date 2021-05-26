@@ -195,7 +195,6 @@ class ClientSide {
 
     void handleGameOver() {
         std::cout << "RECEIVED GAME OVER: nextExpectedEventNo = " << nextExpectedEventNo << std::endl;
-        nextExpectedEventNo = 0;
         isInGame = false;
         currGameId = 0;
     }
@@ -235,6 +234,7 @@ class ClientSide {
     void handleGameRecord(Record &record) {
         ServerEventType eventType = record.getEventType();
         uint32_t eventNo = record.getEventNo();
+        std::cout << "HANDLE GAME RECORD: " << eventType << " eventNo " << eventNo << std::endl;
         if (eventNo != nextExpectedEventNo)
             return;
         nextExpectedEventNo++;
@@ -273,6 +273,7 @@ public:
 
 
     void sendLineToGUI(const std::string &line) {
+        std::cout << "SENDING LINE TO GUI: " << line << std::endl;
         std::string lineWithNewLine = line + "\n";
         send(pollClient.getDescriptor(PollClient::MESSAGE_GUI), lineWithNewLine.c_str(), lineWithNewLine.size(), 0);
     }
@@ -337,6 +338,17 @@ public:
                     exit(1);
                 }
             }
+            if (pollClient.hasPollinOccurred(PollClient::INTERVAL_SENDMESSAGE)) {
+                // std::cout << "Sending message to server!" << std::endl;
+                ClientMessage clientMessage(sessionID, static_cast<uint8_t>(direction), nextExpectedEventNo,
+                                            data.getPlayerName().c_str(), data.getPlayerName().size());
+//                std::cout << "ASKING FOR " << nextExpectedEventNo << "isInGame = " << isInGame << std::endl;
+                // std::cout << clientMessage << std::endl;
+                WritePacket writePacket;
+                clientMessage.encode(writePacket);
+                sendto(sock.getSocket(), writePacket.getBufferConst(), writePacket.getOffset(), 0,
+                       sock.getAddrInfo().ai_addr, sock.getAddrInfo().ai_addrlen);
+            }
             if (pollClient.hasPollinOccurred(PollClient::MESSAGE_SERVER)) {
                 std::cout << "Message server!" << std::endl;
                 ReadPacket readPacket;
@@ -350,43 +362,38 @@ public:
                 std::cout << "received game id = " << rcvdGameID << std::endl;
                 if (isInGame && rcvdGameID != currGameId) {
                     debug_out_0 << "received Game id is incorrect!" << std::endl;
-                } else {
                     try {
-                        if (!isInGame) {
-                            std::cout << " is NOT is game!" << std::endl;
-                            tryToReadNewGame(readPacket, rcvdGameID);
-                        }
-                        size_t initialOffset = readPacket.getOffset();
-                        while (readPacket.getRemainingSize() > 0 && isInGame) {
-                            Record record = Record::decode(readPacket);
-                            handleGameRecord(record);
-                            if (!record.checkCrcOk(readPacket, initialOffset)) {
-                                throw CrcMaker::InvalidCrcException();
-                            } // TODO exit(1) w razie dobrego CRC
-                            initialOffset = readPacket.getOffset();
-                        }
-                    } catch (const Packet::PacketToSmallException &p) {
-                        std::cerr << "Some error reading  " << std::endl;
+                        tryToReadNewGame(readPacket, rcvdGameID);
                     } catch (const EventData::InvalidTypeException &e) {
-                        std::cerr << "Expected New Game but didnt get it!" << std::endl;
-                    } catch (const Packet::FatalDecodingException &p) {
-                        std::cerr << "Decoding exception! " << std::endl;
-                    } catch (const CrcMaker::InvalidCrcException &e) {
-                        std::cerr << "Invalid CRC, skipping package!" << std::endl;
+                        std::cerr << "Invalid game ID and didnt receive new game!" << std::endl;
+                        continue;
                     }
                 }
+                try {
+                    if (!isInGame) {
+                        std::cout << " is NOT is game!" << std::endl;
+                        tryToReadNewGame(readPacket, rcvdGameID);
+                    }
+                    size_t initialOffset = readPacket.getOffset();
+                    while (readPacket.getRemainingSize() > 0 && isInGame) {
+                        Record record = Record::decode(readPacket);
+                        handleGameRecord(record);
+                        if (!record.checkCrcOk(readPacket, initialOffset)) {
+                            throw CrcMaker::InvalidCrcException();
+                        } // TODO exit(1) w razie dobrego CRC
+                        initialOffset = readPacket.getOffset();
+                    }
+                } catch (const Packet::PacketToSmallException &p) {
+                    std::cerr << "Some error reading  " << std::endl;
+                } catch (const EventData::InvalidTypeException &e) {
+                    std::cerr << "Expected New Game but didnt get it!" << std::endl;
+                } catch (const Packet::FatalDecodingException &p) {
+                    std::cerr << "Decoding exception! " << std::endl;
+                } catch (const CrcMaker::InvalidCrcException &e) {
+                    std::cerr << "Invalid CRC, skipping package!" << std::endl;
+                }
             }
-            if (pollClient.hasPollinOccurred(PollClient::INTERVAL_SENDMESSAGE)) {
-                // std::cout << "Sending message to server!" << std::endl;
-                ClientMessage clientMessage(sessionID, static_cast<uint8_t>(direction), nextExpectedEventNo,
-                                            data.getPlayerName().c_str(), data.getPlayerName().size());
-//                std::cout << "ASKING FOR " << nextExpectedEventNo << std::endl;
-                // std::cout << clientMessage << std::endl;
-                WritePacket writePacket;
-                clientMessage.encode(writePacket);
-                sendto(sock.getSocket(), writePacket.getBufferConst(), writePacket.getOffset(), 0,
-                       sock.getAddrInfo().ai_addr, sock.getAddrInfo().ai_addrlen);
-            }
+
         }
     }
 };

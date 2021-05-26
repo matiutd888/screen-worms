@@ -107,7 +107,9 @@ public:
             syserr("Setting size of packet bigger than maxSize");
         this->size = size;
     }
-
+    void setOffset(size_t offset) {
+        this->offset = offset;
+    }
     [[nodiscard]] size_t getRemainingSize() const {
         return size - offset;
     }
