@@ -20,6 +20,7 @@
 #include "Connection.h"
 #include "DataBuilders.h"
 
+
 class MsgQueue {
     static constexpr int CLIENTS_SIZE = 25;
     static constexpr int NO_EVENT = -1;
@@ -81,11 +82,11 @@ public:
 class ClientManager {
     using clientValue_t = std::pair<Player, int>;
     std::map<Client, clientValue_t> clients;
+    Game game;
     int countReadyPlayers;
     int countNotObservers;
-    Game game;
-    std::vector<Record> gameRecords;
     Random random;
+    std::vector<Record> gameRecords;
     MsgQueue queue;
     static constexpr int PLAYER_INDEX = 0;
     static constexpr int TICKS_INDEX = 1;
@@ -105,7 +106,7 @@ public:
             ++next_it;
             auto &valIt = it->second;
             std::get<TICKS_INDEX>(valIt)++;
-            if (std::get<TICKS_INDEX>(valIt) >= 2) {
+            if (std::get<TICKS_INDEX>(valIt) >= Utils::NUMBER_OF_TICKS) {
                 debug_out_1 << "TICKS: Erasing client " << it->first << std::endl;
                 removeClient(it);
                 debug_out_1 << "TICKS: Clients size after = " << clients.size() << std::endl;
@@ -122,18 +123,6 @@ public:
         return !game.isGameNow() && countReadyPlayers == countNotObservers && countNotObservers >= 2;
     }
 
-    // 1. Check if exists
-    // 2.1 If doesnt exist, check if it exceeds the limit.
-    // 2.1.1 If if exceedes the limit, ignore the client.
-    // 2.1.2 If it doesnt exceed the limit, add the client (go to A)
-    // 2.2 If it exists, check if session id is bigger, smaller or the same.
-    // 2.2.1 If its smaller, ignore
-    // 2.2.2 If its bigger, perform client remove and client add
-    // 2.2.3 If its the same, go to 3
-    // 3 Check if playername is same as before.r
-    // 3.1 If its the same, update the player.
-    // 3.2 If its different perform R and A.
-    // 4. Check for game start.
     bool isNameUnique(const std::string &name, const Client &c) {
         for (const auto &it : clients) {
             if (it.second.first.getName() == name && !(it.first == c))
@@ -171,10 +160,10 @@ public:
 
 class Server {
     inline static const std::string TAG = "Server: ";
-    ClientManager manager;
-    UDPServerSocket clientSocket;
-    PollServer pollServer;
     ServerData serverData;
+    ClientManager manager;
+    UDPServerSocket serverSocket;
+    PollServer pollServer;
 
     static void readTimeout(int fd);
 
@@ -187,8 +176,8 @@ public:
     explicit Server(const ServerData &serverData) : serverData(serverData),
                                                     manager(serverData.getWidth(), serverData.getHeight(),
                                                             serverData.getTuriningSpeed(), serverData.getSeed()),
-                                                    clientSocket(serverData.getPortNum()),
-                                                    pollServer(clientSocket.getSocket(),
+                                                    serverSocket(serverData.getPortNum()),
+                                                    pollServer(serverSocket.getSocket(),
                                                                serverData.getRoundsPerSec()) {}
 
     [[noreturn]] void start();

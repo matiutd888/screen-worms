@@ -51,8 +51,8 @@ class ClientSide {
     TCPClientSocket guiSock;
     UDPClientSocket sock;
     PollClient pollClient;
-    TurnDirection direction;
     GUIMessage lastGuiMessage;
+    TurnDirection direction;
     bool isInGame = false;
     uint32_t currGameId;
     uint32_t nextExpectedEventNo;
@@ -64,7 +64,7 @@ class ClientSide {
         try {
             guiMessage = getGuiMessage(guiMsgStr);
             if (guiMessage != lastGuiMessage) {
-                debug_out_1 << " CHANGED DIRECTION ";
+                debug_out_1 << "CHANGED DIRECTION ";
             }
             if (guiMessage == LEFT_KEY_UP) {
                 if (lastGuiMessage == LEFT_KEY_DOWN) {
@@ -79,25 +79,21 @@ class ClientSide {
                 }
             }
             if (guiMessage == RIGHT_KEY_DOWN) {
-                if (lastGuiMessage != LEFT_KEY_DOWN) {
-                    direction = TurnDirection::RIGHT;
-                    lastGuiMessage = guiMessage;
-                }
+                direction = TurnDirection::RIGHT;
+                lastGuiMessage = guiMessage;
             }
             if (guiMessage == LEFT_KEY_DOWN) {
-                if (lastGuiMessage != RIGHT_KEY_DOWN) {
-                    direction = TurnDirection::LEFT;
-                    lastGuiMessage = guiMessage;
-                }
+                direction = TurnDirection::LEFT;
+                lastGuiMessage = guiMessage;
             }
-            std::cout << "currDirection = " << direction << std::endl;
+            debug_out_1 << "currDirection = " << direction << std::endl;
         } catch (...) {
             std::cerr << "[GUI] " << " GUI MESSAGE NOT VALID " << std::endl;
         }
     }
 
     void handleGameOver() {
-        std::cout << "RECEIVED GAME OVER: nextExpectedEventNo = " << nextExpectedEventNo << std::endl;
+        debug_out_0 << "RECEIVED GAME OVER: nextExpectedEventNo = " << nextExpectedEventNo << std::endl;
         isInGame = false;
         currGameId = 0;
     }
@@ -137,7 +133,7 @@ class ClientSide {
     void handleGameRecord(Record &record) {
         ServerEventType eventType = record.getEventType();
         uint32_t eventNo = record.getEventNo();
-        std::cout << "HANDLE GAME RECORD: " << eventType << " eventNo " << eventNo << std::endl;
+        debug_out_1 << "HANDLE GAME RECORD: " << eventType << " eventNo " << eventNo << std::endl;
         if (eventNo != nextExpectedEventNo)
             return;
         nextExpectedEventNo++;
@@ -156,18 +152,18 @@ class ClientSide {
 public:
 //
     explicit ClientSide(const ClientData &clientData) : data(clientData),
-                                               guiSock(data.getGuiPortNum(), data.getGuiAddress().c_str()),
-                                               sock(data.getServerPortNum(), data.getServerAddress().c_str()),
-                                               pollClient(sock.getSocket(), guiSock.getSocket()),
-                                               lastGuiMessage(NO_MSG), direction(TurnDirection::STRAIGHT),
-                                               isInGame(false),
-                                               sessionID(std::chrono::duration_cast<std::chrono::milliseconds>(
-                                                       std::chrono::system_clock::now().time_since_epoch()).count()) {
+                                                        guiSock(data.getGuiPortNum(), data.getGuiAddress().c_str()),
+                                                        sock(data.getServerPortNum(), data.getServerAddress().c_str()),
+                                                        pollClient(sock.getSocket(), guiSock.getSocket()),
+                                                        lastGuiMessage(NO_MSG), direction(TurnDirection::STRAIGHT),
+                                                        isInGame(false), nextExpectedEventNo(0),
+                                                        sessionID(std::chrono::duration_cast<std::chrono::milliseconds>(
+                                                                std::chrono::system_clock::now().time_since_epoch()).count()) {
         std::cout << "constructed clientside!\n";
     }
 
     void sendLineToGUI(const std::string &line) {
-        std::cout << "SENDING LINE TO GUI: " << line << std::endl;
+        debug_out_0 << "SENDING LINE TO GUI: " << line << std::endl;
         std::string lineWithNewLine = line + "\n";
         send(pollClient.getDescriptor(PollClient::MESSAGE_GUI), lineWithNewLine.c_str(), lineWithNewLine.size(), 0);
     }
@@ -203,7 +199,7 @@ public:
         currGameId = rcvdGameId;
         nextExpectedEventNo = 1;
     }
-
+	
     void start() {
         std::cout << "starting client " << std::endl;
         __gnu_cxx::stdio_filebuf<char> filebuf(pollClient.getDescriptor(PollClient::MESSAGE_GUI), std::ios::in);
@@ -224,16 +220,19 @@ public:
                     debug_out_1 << "[GUI] " << "read " << guiMsgStr << " from GUI!" << std::endl;
                     handleGuiMessage(guiMsgStr);
                 } else {
-                    std::cerr << "Invalid read from GUI " << std::endl; // TODO czy to dobrze
+                    std::cerr << "Invalid read from GUI " << std::endl;
                     exit(1);
                 }
             }
             if (pollClient.hasPollinOccurred(PollClient::INTERVAL_SENDMESSAGE)) {
+				uint64_t exp; // Reading timeout.
+				ssize_t s = read(pollClient.getDescriptor(PollClient::INTERVAL_SENDMESSAGE), &exp, sizeof(uint64_t));
+				if (s != sizeof(uint64_t))
+					perror("read timeout pollutils");
+	
                 // std::cout << "Sending message to server!" << std::endl;
                 ClientMessage clientMessage(sessionID, static_cast<uint8_t>(direction), nextExpectedEventNo,
                                             data.getPlayerName().c_str(), data.getPlayerName().size());
-//                std::cout << "ASKING FOR " << nextExpectedEventNo << "isInGame = " << isInGame << std::endl;
-//                 debug_out_1 << clientMessage << std::endl;
                 WritePacket writePacket;
                 clientMessage.encode(writePacket);
                 sendto(sock.getSocket(), writePacket.getBufferConst(), writePacket.getOffset(), 0,
@@ -249,7 +248,7 @@ public:
                                         &addrLen);
                 readPacket.setSize(size);
                 uint32_t rcvdGameID = ServerMessage::getGameId(readPacket);
-                std::cout << "received game id = " << rcvdGameID << std::endl;
+                debug_out_1 << "received game id = " << rcvdGameID << std::endl;
                 if (isInGame && rcvdGameID != currGameId) {
                     debug_out_0 << "received Game id is incorrect!" << std::endl;
                     try {
@@ -260,9 +259,11 @@ public:
                     }
                 }
                 try {
+                    // Unfortunately, I wasn't able to make code for the case of valid CRC and invalid rest of the msg.
                     if (!isInGame) {
                         std::cout << " is NOT is game!" << std::endl;
                         tryToReadNewGame(readPacket, rcvdGameID);
+
                     }
                     size_t initialOffset = readPacket.getOffset();
                     while (readPacket.getRemainingSize() > 0 && isInGame) {
@@ -270,7 +271,7 @@ public:
                         handleGameRecord(record);
                         if (!record.checkCrcOk(readPacket, initialOffset)) {
                             throw CrcMaker::InvalidCrcException();
-                        } // TODO exit(1) w razie dobrego CRC
+                        }
                         initialOffset = readPacket.getOffset();
                     }
                 } catch (const Packet::PacketToSmallException &p) {

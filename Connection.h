@@ -48,35 +48,45 @@ class UDPClientSocket : public Socket {
     struct addrinfo addrInfo;
 public:
     UDPClientSocket(uint16_t portNum, const char *addrName) : Socket() {
-        int sockfd;
-        struct addrinfo hints, *servinfo, *p;
-        int rv;
-        int numbytes;
+        struct addrinfo hints;
+        struct addrinfo *result, *rp;
+        int sfd, s;
 
-        memset(&hints, 0, sizeof hints);
-        hints.ai_family = AF_UNSPEC; // set to AF_INET to use IPv4
-        hints.ai_socktype = SOCK_DGRAM;
+        memset(&hints, 0, sizeof(hints));
+        hints.ai_family = AF_UNSPEC;    /* Allow IPv4 or IPv6 */
+        hints.ai_socktype = SOCK_DGRAM; /* Datagram socket */
+        hints.ai_flags = 0;
+        hints.ai_protocol = 0;          /* Any protocol */
 
-        if ((rv = getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &servinfo)) != 0) {
-            syserr("getaddrinfo");
+        s = getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &result);
+        if (s != 0) {
+            fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(s));
+            exit(EXIT_FAILURE);
         }
-        debug_out_1 << "UDP: Trying to loop through IPS" << std::endl;
-        // loop through all the results and make a socket
-        for (p = servinfo; p != NULL; p = p->ai_next) {
-            if ((sockfd = socket(p->ai_family, p->ai_socktype,
-                                 p->ai_protocol)) == -1) {
-                perror("talker: socket");
+
+        /* getaddrinfo() returns a list of address structures.
+           Try each address until we successfully connect(2).
+           If socket(2) (or connect(2)) fails, we (close the socket
+           and) try the next address. */
+
+        for (rp = result; rp != NULL; rp = rp->ai_next) {
+            sfd = socket(rp->ai_family, rp->ai_socktype,
+                         rp->ai_protocol);
+            if (sfd == -1)
                 continue;
-            }
-            break;
+
+            if (connect(sfd, rp->ai_addr, rp->ai_addrlen) != -1)
+                break;                  /* Success */
+
+            close(sfd);
         }
 
-        if (p == NULL) {
-            syserr("talker: failed to create socket");
+        if (rp ==    NULL) {               /* No address succeeded */
+            fprintf(stderr, "Could not connect\n");
+            exit(EXIT_FAILURE);
         }
-        addrInfo = *p;
-        socknum = sockfd;
-        freeaddrinfo(servinfo);
+        addrInfo = *rp;
+        socknum = sfd;
     }
 
     const struct addrinfo &getAddrInfo() {
@@ -123,6 +133,7 @@ public:
 
     Client() {
         ipType = IPaddressType::NoIP;
+        portNum = 0;
     };
 
     explicit Client(const struct sockaddr_storage &clientAddress);

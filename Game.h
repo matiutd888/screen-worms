@@ -77,9 +77,9 @@ public:
 };
 
 class Worm {
+    double x;
+    double y;
     int direction; // Number from 0 to 360
-
-    double x, y;
     TurnDirection recentTurn;
 
     static double degreesToRadians(uint16_t degrees) {
@@ -100,6 +100,7 @@ public:
     void move() {
         x += std::cos(degreesToRadians(direction));
         y += std::sin(degreesToRadians(direction));
+        std::cout << "(x, y) = (" << x << ", " << y << "), direction = " << direction << std::endl; // DODANE
     }
 
     void turn(int turningSpeed) {
@@ -108,12 +109,18 @@ public:
         } else if (recentTurn == TurnDirection::LEFT) {
             direction -= turningSpeed;
         }
-        direction %= N_DEGREES;
+        while(direction < 0) {
+			direction += N_DEGREES;
+		}
     }
 
     std::pair<uint32_t, uint32_t> getPixel() const {
         return {x, y};
     }
+    
+    std::pair<double, double> getCoordinates() const {
+		return {x, y};
+	}
 
     void setRecentTurn(TurnDirection recentTurn) {
         Worm::recentTurn = recentTurn;
@@ -123,16 +130,16 @@ public:
 
 class Game {
     static inline const std::string TAG = "Game: ";
-    int turningSpeed;
     uint32_t width, height;
-    uint32_t gameID;
     int eventCount;
-    std::map<Player, std::pair<uint32_t, Worm>> activePlayers;
+    uint32_t gameID;
     std::vector<std::vector<bool>> pixels; // false if has not been eaten
+    int turningSpeed;
     bool isGameRightNow;
+    std::map<Player, std::pair<uint32_t, Worm>> activePlayers;
 
-    bool isDead(uint32_t x, uint32_t y) {
-        return (x >= width || y >= height) || pixels[x][y];
+    bool isDead(double x, double y) {
+        return (x >= width || y >= height || x < 0 || y < 0) || pixels[uint32_t(x)][uint32_t(y)];
     }
 
     static std::vector<std::string> generateNamesVector(const std::vector<Player> &players) {
@@ -163,8 +170,7 @@ class Game {
 public:
 
     Game(uint32_t width, uint32_t height, int turningSpeed) : width(width), height(height), eventCount(0),
-                                                              pixels(width, std::vector<bool>(height, false)), turningSpeed(turningSpeed), isGameRightNow(
-                    false) {};
+                                                              pixels(width, std::vector<bool>(height, false)), turningSpeed(turningSpeed), isGameRightNow(false) {};
 
     std::vector<Record> startNewGame(std::vector<Player> &gamePlayers, Random &random);
 

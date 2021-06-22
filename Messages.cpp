@@ -18,7 +18,7 @@ std::shared_ptr<EventData> NewGameData::decode(ReadPacket &packet, uint32_t even
     packet.readData((char *)playersBuff.data(), remainingSize);
     std::vector<std::string> playerNames;
     std::string stringIt;
-    for (int i = 0; i < playersBuff.size(); ++i) {
+    for (size_t i = 0; i < playersBuff.size(); ++i) {
         if (playersBuff[i] == '\0') {
             playerNames.push_back(stringIt);
             stringIt = "";

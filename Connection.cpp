@@ -27,6 +27,7 @@ Client::Client(const sockaddr_storage &clientAddress) {
         ipType = IPaddressType::IPv6;
         portNum = ntohs(((struct sockaddr_in6 *) s)->sin6_port);
     } else {
+        portNum = 0;
         syserr("Client: Incorrect sa_family!");
     }
     char buffIP[INET6_ADDRSTRLEN];
@@ -37,7 +38,7 @@ Client::Client(const sockaddr_storage &clientAddress) {
 }
 
 TCPClientSocket::TCPClientSocket(uint16_t portNum, const char *addrName) : Socket() {
-    int sockfd;
+    int sockfd = -1;
     struct addrinfo hints, *servinfo, *p = NULL;
 
     memset(&hints, 0, sizeof hints);
@@ -85,7 +86,7 @@ TCPClientSocket::TCPClientSocket(uint16_t portNum, const char *addrName) : Socke
     freeaddrinfo(servinfo);
 }
 
-UDPServerSocket::UDPServerSocket(uint16_t portNum, const char *addrName) : Socket() {
+UDPServerSocket::UDPServerSocket(uint16_t portNum,  [[maybe_unused]] const char *addrName) : Socket() {
     int sockfd;
     sockaddr_in6 server_address;
     server_address.sin6_family = AF_INET6;
@@ -97,32 +98,6 @@ UDPServerSocket::UDPServerSocket(uint16_t portNum, const char *addrName) : Socke
 
     if (bind(sockfd, reinterpret_cast<const sockaddr *>(&server_address), sizeof(server_address)) < 0)
         syserr("bind!");
-//    struct addrinfo hints, *servinfo, *p = NULL;
-//    memset(&hints, 0, sizeof hints);
-//    hints.ai_family = AF_UNSPEC; // set to AF_INET to use IPv4
-//    hints.ai_socktype = SOCK_DGRAM;
-////    hints.ai_family.
-//    if (getaddrinfo(addrName, std::to_string(portNum).c_str(), &hints, &servinfo) != 0) {
-//        syserr("getaddrinfo");
-//    }
-//
-//    // loop through all the results and bind to the first we can
-//    for (p = servinfo; p != NULL; p = p->ai_next) {
-//        if ((sockfd = socket(p->ai_family, p->ai_socktype,
-//                             p->ai_protocol)) == -1) {
-//            perror("listener: socket");
-//            continue;
-//        }
-//        if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-//            close(sockfd);
-//            perror("listener: bind");
-//            continue;
-//        }
-//        break;
-//    }
-//
-//    if (p == NULL)
-//        syserr("listener: failed to bind socket\n");
 
     socknum = sockfd;
 }

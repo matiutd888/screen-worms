@@ -2,48 +2,66 @@
 // Created by mateusz on 23.05.2021.
 //
 
+#include <cassert>
 #include "DataBuilders.h"
+
+
+static void assertm(bool exp, const char *msg)  {
+    if (!exp)
+        syserr(msg);
+}
+
+static uint64_t converter(const char *arg, uint64_t lowerBound, uint64_t upperBound, const char *errorMsg) {
+    size_t size = 0;
+    uint64_t argumentNumber = 0;
+    try {
+        argumentNumber = std::stoul(arg, &size);
+    } catch (...) {
+        syserr(errorMsg);
+    }
+    if (size != std::string(arg).size())
+        syserr(errorMsg);
+    if (argumentNumber > upperBound || argumentNumber < lowerBound) {
+        syserr(errorMsg);
+    }
+
+    return argumentNumber;
+}
 
 void ServerDataBuilder::parse(int argc, char **argv) {
     char c;
     while ((c = getopt(argc, argv, Utils::optstring)) != -1) {
-        size_t convertedSize = 0;
-        std::string argStr = optarg;
-        bool haveFound = false;
         switch (c) {
-            case 'p': {
-                portNum = std::stoi(argStr, &convertedSize);
-                haveFound = true;
+            case 'p':
+                portNum = converter(optarg, 1, UINT16_MAX, "Invalid portnum argument!");
                 break;
-            }
-            case 's': {
-                seed = std::stoul(argStr, &convertedSize);
-                haveFound = true;
+            case 's':
+                seed = converter(optarg, 1, UINT32_MAX, "Invalid seed argument!");
                 break;
-            }
-            case 't': {
-                turiningSpeed = std::stoi(argStr, &convertedSize);
-                haveFound = true;
+            case 't':
+                turiningSpeed = int(converter(optarg, 1, 90, "Invalid turiningSpeed argument!"));
                 break;
-            }
             case 'v':
-                roundsPerSec = std::stoi(argStr, &convertedSize);
-                haveFound = true;
+                roundsPerSec = int(converter(optarg,1, 250, "Invalid roundsPerSec argument!"));
                 break;
             case 'w':
-                width = std::stoul(argStr, &convertedSize);
-                haveFound = true;
+                width = converter(optarg, 16, 2048, "Invalid width argument!");
                 break;
             case 'h':
-                height = std::stoul(argStr, &convertedSize);
-                haveFound = true;
+                height = converter(optarg, 16, 2048, "Invalid height argument!");
                 break;
-            default:;
+            default:
+                syserr("Incorrect argument!\n");
         }
-        if (haveFound) {
-            if (convertedSize != argStr.size())
-                syserr("Argument parsing error!");
-        }
+    }
+    if (optind < argc) {
+        syserr("Unexpected argument!\n");
+    }
+}
+
+static void checkPlayerName(const std::string &name) {
+    for (const auto &c : name) {
+        assertm(c >= 33 && c <= 126, "Invalid Player Name!");
     }
 }
 
@@ -54,31 +72,26 @@ void ClientDataBuilder::parse(int argc, char **argv) {
     serverAddress = argv[1];
     optind = 2;
     while ((c = getopt(argc, argv, "n:p:i:r:")) != -1) {
-        // TODO wywalać się jak nie poda
         std::string argStr(optarg);
-        size_t convertedSize = 0;
         printf("%c\n", c);
-        bool haveFoundNumber = false;
         switch (c) {
             case 'n':
                 playerName = argStr;
+                checkPlayerName(playerName);
                 break;
             case 'p':
-                serverPortNum = std::stoi(argStr, &convertedSize);
-                haveFoundNumber = true;
+                serverPortNum = converter(optarg, 1, UINT16_MAX, "Invalid Server portnum!");
                 break;
             case 'i':
                 guiAddress = argStr;
                 break;
             case 'r':
-                guiPortNum = std::stoi(argStr, &convertedSize);
-                haveFoundNumber = true;
+                guiPortNum = converter(optarg, 1, UINT16_MAX, "Invalid Server portnum!");
                 break;
             default:;
         }
-        if (haveFoundNumber) {
-            if (convertedSize != argStr.size())
-                syserr("Argument parsing error!");
-        }
+    }
+    if (optind < argc) {
+        syserr("Unexpected argument!\n");
     }
 }

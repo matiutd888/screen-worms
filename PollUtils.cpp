@@ -22,7 +22,7 @@ int PollUtils::getTimeoutFd(time_t tv_sec, long tv_nsec) {
 
 bool PollUtils::hasPollinOccurred(int index) const {
     if (index >= numberOfDescriptors) {
-        syserr("invalid Poll index!");
+        return false;
     }
     return pollData[index].revents & POLLIN;
 }
@@ -41,7 +41,10 @@ bool PollUtils::hasPolloutOccurred(int index) const {
     return pollData[index].revents & POLLOUT;
 }
 
-PollServer::PollServer(int socket, int roundsPerSec) : PollUtils(N_DESC) {
+// We call default constructor with N_DESC - 1 because initially we don't want to perform rounds.
+PollServer::PollServer(int socket, int roundsPerSec) : PollUtils(N_DESC - 1) {
+	this->roundsPerSec = roundsPerSec;
+	
     pollData[MESSAGE_CLIENT].fd = socket;
     pollData[MESSAGE_CLIENT].events = POLLIN;
 
@@ -54,12 +57,6 @@ PollServer::PollServer(int socket, int roundsPerSec) : PollUtils(N_DESC) {
 
     pollData[TIMEOUT_CLIENT].events = POLLIN;
 
-    if (roundsPerSec > 1) {
-        long nanoTimeoutRounds = Utils::SEC_TO_NANOSEC / roundsPerSec;
-        pollData[TIMEOUT_ROUND].fd = getTimeoutFd(0, nanoTimeoutRounds);
-    } else {
-        pollData[TIMEOUT_ROUND].fd = getTimeoutFd(1, 0);
-    }
     pollData[TIMEOUT_ROUND].events = POLLIN;
 }
 
@@ -69,4 +66,18 @@ void PollServer::addPolloutToEvents(int index) {
 
 void PollServer::removePolloutFromEvents(int index) {
     pollData[index].events = POLLIN;
+}
+
+void PollServer::addTimeoutRound() {
+    if (roundsPerSec > 1) {
+        long nanoTimeoutRounds = Utils::SEC_TO_NANOSEC / roundsPerSec;
+        pollData[TIMEOUT_ROUND].fd = getTimeoutFd(0, nanoTimeoutRounds);
+    } else {
+        pollData[TIMEOUT_ROUND].fd = getTimeoutFd(1, 0);
+    }
+	numberOfDescriptors++;
+}
+
+void PollServer::removeTimeoutRound() {
+	numberOfDescriptors--;
 }

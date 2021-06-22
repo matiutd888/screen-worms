@@ -6,7 +6,6 @@
 
 uint32_t Random::generate() {
     uint32_t ret = r;
-    uint64_t calc = r * MULTIPLY_CONST;
-    r = calc % MODULO_CONST;
+    r = ((r * MULTIPLY_CONST) % MODULO_CONST);
     return ret;
 }

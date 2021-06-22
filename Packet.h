@@ -75,7 +75,7 @@ public:
 
     // Throws @ParseException
     void write(const void *data, size_t dataSize) {
-        if (offset + dataSize >= MAX_SIZE)
+        if (offset + dataSize > MAX_SIZE)
             throw Packet::FatalEncodingException();
 //        std::cout << TAG << "Writing " << dataSize << " bytes to packet of size " << getRemainingSize() << " and offset " << offset << std::endl;
 

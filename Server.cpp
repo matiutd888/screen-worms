@@ -62,7 +62,7 @@ void MsgQueue::updateClient(const Client &client, uint32_t nextExpectedEventNo) 
     }
     for(int i = 0; i < CLIENTS_SIZE; i++) {
         if (clients[i] == client) {
-            std::cout << "Client: " << client << " expected event no = " << nextExpectedEventNo << std::endl;
+            debug_out_1 << "Updating Client: " << client << " expected event no = " << nextExpectedEventNo << std::endl;
             expectedEventNo[i] = nextExpectedEventNo;
             return;
         }
@@ -90,20 +90,29 @@ void MsgQueue::setExpectedEventNo(size_t index, uint32_t value) {
 }
 
 std::pair<WritePacket, Client> ClientManager::handleNextInQueue() {
+	std::cout << "we have " << gameRecords.size() << " events to send" << std::endl;
     size_t clientIndex = queue.getNextExpectedClientIndexAndAdvance();
+    std::cout << "we will be sending for " << clientIndex << std::endl;
     uint32_t nextExpectedEventNo = queue.getExpectedEventNo(clientIndex);
+    std::cout << "he expects event no " << nextExpectedEventNo << std::endl;
     Client client = queue.getClientByIndex(clientIndex);
     WritePacket writePacket;
     ServerMessage::startServerMessage(writePacket, game.getGameId());
     uint32_t eventNoIt = nextExpectedEventNo;
-    while (eventNoIt < gameRecords.size() && writePacket.getRemainingSize() > gameRecords[eventNoIt].getSize()) {
+    std::cout << "starting encoding events " << std::endl;
+    while (eventNoIt < gameRecords.size() && writePacket.getRemainingSize() >= gameRecords[eventNoIt].getSize()) {
         try {
+			std::cout << "encoding event " << eventNoIt << " for " << client << std::endl;
             gameRecords[eventNoIt].encode(writePacket);
             eventNoIt++;
         } catch (const Packet::PacketToSmallException &p){
             break;
         }
     }
+    if (eventNoIt < gameRecords.size()) {
+		std::cout << "write packet size " << writePacket.getRemainingSize() << ", gameRecords = " << gameRecords[eventNoIt].getSize() << std::endl;
+	}
+    std::cout << "ending encoding events " << std::endl;
     queue.setExpectedEventNo(clientIndex, eventNoIt);
     return {writePacket, client};
 }
@@ -132,7 +141,6 @@ void ClientManager::addClient(const Client &client, const ClientMessage &newMsg)
 
 void ClientManager::removeClient(const std::map<Client, ClientManager::clientValue_t>::iterator &iterator) {
     debug_out_1 << "REMOVING CLIENT " << std::endl;
-    const Client &client = iterator->first;
     const Player &player = std::get<PLAYER_INDEX>(iterator->second);
     if (!player.isObserver())
         countNotObservers--;
@@ -157,11 +165,11 @@ void ClientManager::updateClientPlayersInfo(const Client &client, ClientManager:
         bool after = player.isPlayerReady();
         if (!before && after) {
             countReadyPlayers++;
-            debug_out_1 << "PLAYER BECAME READY: " << player << " COUNT READY PLAYERS = " << countReadyPlayers << std::endl;
+            std::cout << "PLAYER BECAME READY: " << player << " COUNT READY PLAYERS = " << countReadyPlayers << std::endl;
         }
     }
     std::get<TICKS_INDEX>(val) = 0;
-    debug_out_1 << "Updating client: " << client << " queue index!" << std::endl;
+    std::cout << "Updating client: " << client << " queue index!" << std::endl;
     queue.updateClient(client, message.getNextExpectedEventNo());
 }
 
@@ -174,6 +182,7 @@ void ClientManager::handleClient(Client &newClient, const ClientMessage &newMsg)
         addClient(newClient, newMsg);
         return;
     }
+    std::cout << "I will be updating client " << newClient << std::endl;
     const auto &it = clients.find(newClient);
     clientValue_t &clientValue = it->second;
     std::get<TICKS_INDEX>(clientValue) = 0;
@@ -189,6 +198,7 @@ void ClientManager::handleClient(Client &newClient, const ClientMessage &newMsg)
         return;
     }
     if (std::get<PLAYER_INDEX>(clientValue).getName() == newMsg.getStringPlayerName()) {
+		std::cout << "Name matches " << std::get<PLAYER_INDEX>(clientValue).getName() << " " << newMsg.getStringPlayerName() << std::endl;
         updateClientPlayersInfo(it->first, clientValue, newMsg);
     } else {
         removeClient(it);
@@ -245,7 +255,7 @@ void Server::readTimeout(int fd) {
 }
 
 void Server::readFromClients(sockaddr_storage &clientAddr, ReadPacket &packet) {
-    std::cout << "READ FROM CLIENTS!" << std::endl;
+//    std::cout << "READ FROM CLIENTS!" << std::endl;
     socklen_t clientAddrLen = sizeof(clientAddr);
 
     ssize_t numBytes = recvfrom(pollServer.getDescriptor(PollServer::MESSAGE_CLIENT),
@@ -263,6 +273,7 @@ void Server::readFromClients(sockaddr_storage &clientAddr, ReadPacket &packet) {
 }
 
 void Server::sendPacketToClient(const Client &client, const WritePacket &writePacket) const {
+	std::cout << "sending packet to client " << client << std::endl;
     const struct sockaddr_storage *sockaddrStorage = &client.getSockaddrStorage();
     if (sendto(pollServer.getDescriptor(PollServer::MESSAGE_CLIENT), writePacket.getBufferConst(),
                writePacket.getOffset(), 0,
@@ -286,6 +297,9 @@ void Server::start() {
             readTimeout(pollServer.getDescriptor(PollServer::TIMEOUT_ROUND));
             if (manager.getGame().isGameNow()) {
                 manager.performRound();
+				if (!manager.getGame().isGameNow()) {
+					pollServer.removeTimeoutRound();
+				}
             }
         }
         if (pollServer.hasPollinOccurred(PollServer::TIMEOUT_CLIENT)) {
@@ -304,17 +318,20 @@ void Server::start() {
                 if (!manager.getGame().isGameNow()) {
                     if (manager.canGameStart()) {
                         manager.startGame();
+                        pollServer.addTimeoutRound();
+                        std::cout << "starting the game " << std::endl;
                     } else {
                         debug_out_1 << "Game cannot start!" << std::endl;
                     }
                 }
-            } catch (const Packet::PacketToSmallException &p) {
+            } catch (...) {
                 debug_out_0 << "Error decoding client message!" << std::endl;
                 continue;
             }
         }
         if (pollServer.hasPolloutOccurred(PollServer::MESSAGE_CLIENT) && manager.hasMessages()) {
             auto packetToSend = manager.handleNextInQueue();
+            std::cout << "sending packet!" << std::endl;
             sendPacketToClient(packetToSend.second, packetToSend.first);
             pollServer.removePolloutFromEvents(PollServer::MESSAGE_CLIENT);
         }
@@ -322,4 +339,5 @@ void Server::start() {
             pollServer.addPolloutToEvents(PollServer::MESSAGE_CLIENT);
         }
     }
+    pollServer.closeAllDescriptors(); // Unreachable code but let's put it here anyway.
 }

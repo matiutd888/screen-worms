@@ -368,7 +368,7 @@ public:
         packet.write(&typeNetwork, sizeof(typeNetwork));
     }
 
-    static std::shared_ptr<EventData> decode(ReadPacket &packet) {
+    static std::shared_ptr<EventData> decode( [[maybe_unused]] ReadPacket &packet) {
         return std::make_shared<GameOver>(GameOver());
     }
 };
@@ -459,7 +459,7 @@ public:
 class ServerMessage {
 public:
     static void startServerMessage(WritePacket &packet, uint32_t gameId) {
-        std::cout << "SERVER MESSAGE: writing " << gameId << " to packet!" << std::endl;
+        debug_out_1 << "SERVER MESSAGE: writing " << gameId << " to packet!" << std::endl;
         if (packet.getRemainingSize() < sizeof(gameId))
             throw Packet::PacketToSmallException();
         write32ToPacket(packet, gameId);
@@ -469,7 +469,7 @@ public:
     static uint32_t getGameId(ReadPacket &packet) {
         uint32_t gameId;
         read32FromPacket(packet, gameId);
-        std::cout << "SERVER MESSAGE: read " << gameId << " from packet! " << std::endl;
+        debug_out_1 << "SERVER MESSAGE: read " << gameId << " from packet! " << std::endl;
         return gameId;
     }
 };
