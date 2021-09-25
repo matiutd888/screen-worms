@@ -393,6 +393,7 @@ class Record {
     std::shared_ptr<EventData> eventData;
     uint32_t crc32;
     Record() = default;
+
     static uint8_t constexpr max_event_type = 3;
 public:
     Record(uint32_t eventNo, std::shared_ptr<EventData> eventData) {
