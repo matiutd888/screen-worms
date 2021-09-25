@@ -17,27 +17,35 @@ protected:
     char buffer[MAX_SIZE];
 public:
     class PacketToSmallException : std::exception {
-        const char * what() const noexcept override {
-            return "PACKET TO SMALL TO PERFORM READ / WRITE ";
+        const char *what() const
+
+        noexcept override{
+                return "PACKET TO SMALL TO PERFORM READ / WRITE ";
         }
     };
 
     class FatalEncodingException : std::exception {
     public:
-        const char *what() const noexcept override {
-            return "Parse exception occured!";
+        const char *what() const
+
+        noexcept override{
+                return "Parse exception occured!";
         }
     };
 
     class FatalDecodingException : std::exception {
     public:
-        const char *what() const noexcept override {
-            return "Parse exception occured!";
+        const char *what() const
+
+        noexcept override{
+                return "Parse exception occured!";
         }
     };
+
     static size_t getMaxSize() {
         return MAX_SIZE;
     }
+
     const char *getBufferConst() const {
         return buffer;
     }
@@ -68,16 +76,11 @@ public:
     [[nodiscard]] size_t getOffset() const {
         return offset;
     }
-//
-//    char *getBufferWithOffset(size_t customOffset) {
-//        return (buffer + customOffset);
-//    }
 
-    // Throws @ParseException
     void write(const void *data, size_t dataSize) {
-        if (offset + dataSize > MAX_SIZE)
+        if (offset + dataSize > MAX_SIZE) {
             throw Packet::FatalEncodingException();
-//        std::cout << TAG << "Writing " << dataSize << " bytes to packet of size " << getRemainingSize() << " and offset " << offset << std::endl;
+        }
 
         memcpy(buffer + offset, data, dataSize);
         offset += dataSize;
@@ -86,6 +89,7 @@ public:
 };
 
 class ReadPacket : public Packet {
+    static inline std::string TAG = "ReadPacket: ";
     bool isOK;
     size_t size;
     size_t offset;
@@ -100,20 +104,24 @@ public:
     }
 
     void setSize(size_t size) {
-        if (size > MAX_SIZE)
+        if (size > MAX_SIZE) {
             syserr("Setting size of packet bigger than maxSize");
+        }
         this->size = size;
     }
+
     void setOffset(size_t offset) {
         this->offset = offset;
     }
+
     [[nodiscard]] size_t getRemainingSize() const {
         return size - offset;
     }
 
     void readData(void *dst, size_t dataSize) {
-        if (getRemainingSize() < dataSize)
+        if (getRemainingSize() < dataSize) {
             throw Packet::FatalDecodingException();
+        }
         memcpy(dst, buffer + offset, dataSize);
         offset += dataSize;
     }
@@ -121,7 +129,6 @@ public:
     size_t getOffset() const {
         return offset;
     }
-    static inline std::string TAG = "ReadPacket: ";
 };
 
 #endif //ZADANIE_2_PACKET_H

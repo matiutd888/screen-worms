@@ -20,7 +20,6 @@
 #include "Connection.h"
 #include "DataBuilders.h"
 
-
 class MsgQueue {
     static constexpr int CLIENTS_SIZE = 25;
     static constexpr int NO_EVENT = -1;
@@ -168,7 +167,6 @@ class Server {
     static void readTimeout(int fd);
 
     void readFromClients(struct sockaddr_storage &clientAddr, ReadPacket &packet);
-
 
     void sendPacketToClient(const Client &client, const WritePacket &writePacket) const;
 

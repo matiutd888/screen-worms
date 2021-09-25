@@ -5,7 +5,6 @@
 #include <cassert>
 #include "DataBuilders.h"
 
-
 static void assertm(bool exp, const char *msg)  {
     if (!exp)
         syserr(msg);

@@ -39,7 +39,7 @@ std::vector<Record> Game::doRound() {
                     Record(eventCount++, std::make_shared<PlayerEliminatedData>(PlayerEliminatedData(it->second.first))));
             activePlayers.erase(it);
             if (checkForGameEnd()) {
-                debug_out_0 << "GAME: " << "PUSHING GAME OVER! " << eventCount << std::endl;
+                debug_out_0 << "GAME: " << "PUsSHING GAME OVER! " << eventCount << std::endl;
                 records.emplace_back(
                         Record(eventCount++, std::make_shared<GameOver>(GameOver()))
                 );

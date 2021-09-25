@@ -90,35 +90,27 @@ void MsgQueue::setExpectedEventNo(size_t index, uint32_t value) {
 }
 
 std::pair<WritePacket, Client> ClientManager::handleNextInQueue() {
-	std::cout << "we have " << gameRecords.size() << " events to send" << std::endl;
     size_t clientIndex = queue.getNextExpectedClientIndexAndAdvance();
-    std::cout << "we will be sending for " << clientIndex << std::endl;
     uint32_t nextExpectedEventNo = queue.getExpectedEventNo(clientIndex);
-    std::cout << "he expects event no " << nextExpectedEventNo << std::endl;
     Client client = queue.getClientByIndex(clientIndex);
+
     WritePacket writePacket;
     ServerMessage::startServerMessage(writePacket, game.getGameId());
     uint32_t eventNoIt = nextExpectedEventNo;
-    std::cout << "starting encoding events " << std::endl;
     while (eventNoIt < gameRecords.size() && writePacket.getRemainingSize() >= gameRecords[eventNoIt].getSize()) {
         try {
-			std::cout << "encoding event " << eventNoIt << " for " << client << std::endl;
             gameRecords[eventNoIt].encode(writePacket);
             eventNoIt++;
         } catch (const Packet::PacketToSmallException &p){
             break;
         }
     }
-    if (eventNoIt < gameRecords.size()) {
-		std::cout << "write packet size " << writePacket.getRemainingSize() << ", gameRecords = " << gameRecords[eventNoIt].getSize() << std::endl;
-	}
-    std::cout << "ending encoding events " << std::endl;
+
     queue.setExpectedEventNo(clientIndex, eventNoIt);
     return {writePacket, client};
 }
 
 void ClientManager::addClient(const Client &client, const ClientMessage &newMsg) {
-    // newMsg.
     if (!isNameUnique(newMsg.getStringPlayerName(), client))
         return;
 

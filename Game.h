@@ -26,12 +26,13 @@ class Player {
     uint64_t sessionID;
 public:
     Player(const std::string &playerName, TurnDirection direction, uint64_t sessionID) : playerName(playerName),
-                                                                                      enteredDirection(direction),
-                                                                                      sessionID(sessionID){
-        if (direction != TurnDirection::STRAIGHT)
+                                                                                         enteredDirection(direction),
+                                                                                         sessionID(sessionID) {
+        if (direction != TurnDirection::STRAIGHT) {
             isReady = true;
-        else
+        } else {
             isReady = false;
+        }
     }
 
     uint64_t getSessionId() const {
@@ -73,13 +74,14 @@ public:
     const std::string &getName() const {
         return playerName;
     }
+
     Player() = default;
 };
 
 class Worm {
     double x;
     double y;
-    int direction; // Number from 0 to 360
+    int direction; // Number from 0 to 360.
     TurnDirection recentTurn;
 
     static double degreesToRadians(uint16_t degrees) {
@@ -93,9 +95,9 @@ public:
     Worm() = default;
 
     Worm(double x, double y, int direction, TurnDirection turn) : x(x),
-                                                                       y(y),
-                                                                       direction(direction),
-                                                                       recentTurn(turn) {}
+                                                                  y(y),
+                                                                  direction(direction),
+                                                                  recentTurn(turn) {}
 
     void move() {
         x += std::cos(degreesToRadians(direction));
@@ -109,18 +111,18 @@ public:
         } else if (recentTurn == TurnDirection::LEFT) {
             direction -= turningSpeed;
         }
-        while(direction < 0) {
-			direction += N_DEGREES;
-		}
+        while (direction < 0) {
+            direction += N_DEGREES;
+        }
     }
 
-    std::pair<uint32_t, uint32_t> getPixel() const {
+    std::pair <uint32_t, uint32_t> getPixel() const {
         return {x, y};
     }
-    
+
     std::pair<double, double> getCoordinates() const {
-		return {x, y};
-	}
+        return {x, y};
+    }
 
     void setRecentTurn(TurnDirection recentTurn) {
         Worm::recentTurn = recentTurn;
@@ -133,17 +135,17 @@ class Game {
     uint32_t width, height;
     int eventCount;
     uint32_t gameID;
-    std::vector<std::vector<bool>> pixels; // false if has not been eaten
+    std::vector <std::vector<bool>> pixels; // false if has not been eaten
     int turningSpeed;
     bool isGameRightNow;
-    std::map<Player, std::pair<uint32_t, Worm>> activePlayers;
+    std::map <Player, std::pair<uint32_t, Worm>> activePlayers;
 
     bool isDead(double x, double y) {
         return (x >= width || y >= height || x < 0 || y < 0) || pixels[uint32_t(x)][uint32_t(y)];
     }
 
-    static std::vector<std::string> generateNamesVector(const std::vector<Player> &players) {
-        std::vector<std::string> ret(players.size());
+    static std::vector <std::string> generateNamesVector(const std::vector <Player> &players) {
+        std::vector <std::string> ret(players.size());
         for (size_t i = 0; i < players.size(); i++) {
             ret[i] = players[i].getName();
         }
@@ -152,7 +154,7 @@ class Game {
 
     void clearBoard() {
         for (auto &it_v : pixels) {
-            for(size_t i = 0; i < it_v.size(); i++) {
+            for (size_t i = 0; i < it_v.size(); i++) {
                 it_v[i] = false;
             }
         }
@@ -167,14 +169,16 @@ class Game {
     bool checkForGameEnd() {
         return activePlayers.size() == 1;
     }
+
 public:
 
     Game(uint32_t width, uint32_t height, int turningSpeed) : width(width), height(height), eventCount(0),
-                                                              pixels(width, std::vector<bool>(height, false)), turningSpeed(turningSpeed), isGameRightNow(false) {};
+                                                              pixels(width, std::vector<bool>(height, false)),
+                                                              turningSpeed(turningSpeed), isGameRightNow(false) {};
 
-    std::vector<Record> startNewGame(std::vector<Player> &gamePlayers, Random &random);
+    std::vector <Record> startNewGame(std::vector <Player> &gamePlayers, Random &random);
 
-    std::vector<Record> doRound();
+    std::vector <Record> doRound();
 
     bool isGameNow() const {
         return isGameRightNow;

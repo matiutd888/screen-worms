@@ -26,8 +26,6 @@ inline void read64FromPacket(ReadPacket &packet, uint64_t &x) {
     uint64_t networkx;
     packet.readData(&networkx, sizeof(networkx));
     x = be64toh(networkx);
-//    debug_out << "networkx " << networkx << std::endl;
-//    debug_out << "x " << x << std::endl;
 }
 
 inline void writeShortToPacket(WritePacket &packet, uint16_t x) {
@@ -118,13 +116,17 @@ public:
 };
 
 class ClientMessage {
+    static constexpr size_t MAX_PLAYER_NAME_LENGTH = 20;
+
     uint64_t sessionID;
     uint8_t turnDirection;
     uint32_t nextExpectedEventNo;
-    static constexpr size_t MAX_PLAYER_NAME_LENGTH = 20;
     char playerName[MAX_PLAYER_NAME_LENGTH];
     size_t playerNameSize;
+    std::string playerNameString;
+
     ClientMessage() = default;
+
     static bool checkIfNameOK(const char *name, size_t nameSize) {
         for (size_t i = 0; i < nameSize; i++) {
             if (!charOK(name[i]))
@@ -132,15 +134,22 @@ class ClientMessage {
         }
         return true;
     }
+
+    void loadPlayerNameString() {
+        playerNameString.resize(playerNameSize);
+        memcpy((char *)playerNameString.data(), playerName, playerNameSize);
+    }
 public:
     ClientMessage(uint64_t sessionId, uint8_t turnDirection, uint32_t nextExpectedEventNo, const char *playerName, size_t playerNameSize)
             : sessionID(sessionId), turnDirection(turnDirection), nextExpectedEventNo(nextExpectedEventNo), playerNameSize(playerNameSize) {
         if (playerNameSize > MAX_PLAYER_NAME_LENGTH) {
             syserr("Invalid player Name!\n");
         }
-        if (!checkIfNameOK(playerName, playerNameSize))
+        if (!checkIfNameOK(playerName, playerNameSize)) {
             syserr("Name not legit!\n");
+        }
         memcpy(this->playerName, playerName, playerNameSize);
+        loadPlayerNameString();
     }
 
     static size_t minimumMessageSize() {
@@ -157,8 +166,9 @@ public:
         }
         read64FromPacket(packet, clientMessage.sessionID);
         packet.readData(&clientMessage.turnDirection, sizeof(turnDirection));
-        if (clientMessage.turnDirection > Utils::TURN_MAX_VALUE)
+        if (clientMessage.turnDirection > Utils::TURN_MAX_VALUE) {
             throw Packet::FatalDecodingException();
+        }
 
         read32FromPacket(packet, clientMessage.nextExpectedEventNo);
 
@@ -177,8 +187,11 @@ public:
         s.resize(clientMessage.getPlayerNameSize());
         memcpy((char *)s.data(), clientMessage.playerName, clientMessage.playerNameSize);
         clientMessage.playerNameSize = remainingSize;
-        if (!checkIfNameOK(clientMessage.playerName, clientMessage.playerNameSize))
+        if (!checkIfNameOK(clientMessage.playerName, clientMessage.playerNameSize)) {
             throw Packet::FatalDecodingException();
+        }
+
+        clientMessage.loadPlayerNameString();
         return clientMessage;
     }
 
@@ -189,16 +202,13 @@ public:
         return os;
     }
 
-    [[nodiscard]] std::string getStringPlayerName() const {
-        std::string s;
-        s.resize(playerNameSize);
-        memcpy((char *)s.data(), playerName, playerNameSize);
-        return s;
-    };
-
     [[nodiscard]] uint32_t getNextExpectedEventNo() const {
         return nextExpectedEventNo;
     }
+
+    const std::string &getStringPlayerName() const {
+        return playerNameString;
+    };
 
     size_t getPlayerNameSize() const {
         return playerNameSize;
@@ -246,7 +256,10 @@ class NewGameData : public EventData {
     uint32_t x, y;
     std::vector<std::string> playerNames;
     size_t playerNameSize;
-    NewGameData() {type = ServerEventType::NEW_GAME;}
+
+    NewGameData() {
+        type = ServerEventType::NEW_GAME;
+    }
 public:
     NewGameData(uint32_t x, uint32_t y, const std::vector<std::string> &playerNames) : x(x), y(y),
                                                                                        playerNames(playerNames) {

@@ -15,12 +15,13 @@ class PollUtils {
 protected:
     static constexpr int MAX_DESC = 10;
     struct pollfd pollData[MAX_DESC];
+    int numberOfDescriptors;
 
     static int getTimeoutFd(time_t tv_sec, long tv_nsec);
-	int numberOfDescriptors;
+
 private:
-    
     static constexpr int TIMEOUT_MS = 2000;
+
 public:
     int doPoll() {
         return poll(pollData, numberOfDescriptors, TIMEOUT_MS);
@@ -62,7 +63,7 @@ public:
     static constexpr int TIMEOUT_CLIENT = 1;
     static constexpr int TIMEOUT_ROUND = 2;
 
-	// We call default constructor with N_DESC - 1 because initially we don't want to perform rounds.
+    // We call default constructor with N_DESC - 1 because initially we don't want to perform rounds.
     PollServer() : PollUtils(N_DESC - 1) {}
 
     PollServer(int socket, int roundsPerSec);
@@ -70,21 +71,25 @@ public:
     void addPolloutToEvents(int index);
 
     void removePolloutFromEvents(int index);
-    
+
     void addTimeoutRound();
-    
+
     void removeTimeoutRound();
 };
 
 class PollClient : public PollUtils {
     static constexpr int N_DESC = 3;
+
+    static long milisecToNano(long millisec) {
+        return millisec * 1e6;
+    }
 public:
     static constexpr int MESSAGE_SERVER = 0;
     static constexpr int INTERVAL_SENDMESSAGE = 1;
     static constexpr int MESSAGE_GUI = 2;
 
     PollClient() : PollUtils(N_DESC) {};
-	
+
     PollClient(int serverfd, int guifd) : PollUtils(N_DESC) {
         pollData[MESSAGE_SERVER].fd = serverfd;
         pollData[MESSAGE_SERVER].events = POLLIN;
@@ -97,11 +102,6 @@ public:
         }
         pollData[INTERVAL_SENDMESSAGE].fd = getTimeoutFd(0, nano);
         pollData[INTERVAL_SENDMESSAGE].events = POLLIN;
-    }
-
-private:
-    static long milisecToNano(long millisec) {
-        return millisec * 1e6;
     }
 };
 

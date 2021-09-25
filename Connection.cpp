@@ -20,6 +20,7 @@ bool Client::operator<(const Client &rhs) const {
 Client::Client(const sockaddr_storage &clientAddress) {
     sockaddrStorage = clientAddress;
     auto *s = reinterpret_cast<sockaddr *>(&sockaddrStorage);
+
     if (s->sa_family == AF_INET) {
         ipType = IPaddressType::IPv4;
         portNum = ntohs(((struct sockaddr_in *) s)->sin_port);
@@ -49,6 +50,7 @@ TCPClientSocket::TCPClientSocket(uint16_t portNum, const char *addrName) : Socke
         syserr("getaddrinfo");
     }
     debug_out_1 << "TCP: Trying to loop through IPS" << std::endl;
+
     // loop through all the results and connect to the first we can
     for (p = servinfo; p != NULL; p = p->ai_next) {
         if ((sockfd = socket(p->ai_family, p->ai_socktype,
@@ -57,14 +59,14 @@ TCPClientSocket::TCPClientSocket(uint16_t portNum, const char *addrName) : Socke
             continue;
         }
 
-//            https://stackoverflow.com/questions/31997648/where-do-i-set-tcp-nodelay-in-this-c-tcp-client
-        int yes = 1;
+//       https://stackoverflow.com/questions/31997648/where-do-i-set-tcp-nodelay-in-this-c-tcp-client
+        int optval = 1;
         int result = setsockopt(sockfd,
                                 IPPROTO_TCP,
                                 TCP_NODELAY,
-                                (char *) &yes,
+                                (char *) &optval,
                                 sizeof(int));
-        // 1 - on, 0 - off
+        // 1 - on, 0 - off,
         if (result < 0) {
             perror("client: set sock opt");
             continue;
@@ -78,8 +80,9 @@ TCPClientSocket::TCPClientSocket(uint16_t portNum, const char *addrName) : Socke
 
         break;
     }
-    if (p == NULL)
+    if (p == NULL) {
         syserr("listener: failed to bind socket\n");
+    }
 
     socknum = sockfd;
 
@@ -93,11 +96,13 @@ UDPServerSocket::UDPServerSocket(uint16_t portNum,  [[maybe_unused]] const char 
     server_address.sin6_addr = in6addr_any;
     server_address.sin6_port = htons(portNum);
 
-    if ((sockfd = socket(AF_INET6, SOCK_DGRAM, 0)) == -1)
+    if ((sockfd = socket(AF_INET6, SOCK_DGRAM, 0)) == -1) {
         syserr("Error calling socket");
+    }
 
-    if (bind(sockfd, reinterpret_cast<const sockaddr *>(&server_address), sizeof(server_address)) < 0)
+    if (bind(sockfd, reinterpret_cast<const sockaddr *>(&server_address), sizeof(server_address)) < 0) {
         syserr("bind!");
+    }
 
     socknum = sockfd;
 }
