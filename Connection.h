@@ -29,7 +29,7 @@ protected:
 public:
     Socket() = default;
 
-    [[nodiscard]] int getSocket() const {
+     int getSocket() const {
         return socknum;
     }
 
@@ -119,7 +119,7 @@ public:
         return ipType == rhs.ipType && ipAddress == rhs.ipAddress && portNum == rhs.portNum;
     }
 
-    [[nodiscard]] const sockaddr_storage &getSockaddrStorage() const {
+     const sockaddr_storage &getSockaddrStorage() const {
         return sockaddrStorage;
     }
 

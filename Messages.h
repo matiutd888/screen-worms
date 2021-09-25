@@ -202,7 +202,7 @@ public:
         return os;
     }
 
-    [[nodiscard]] uint32_t getNextExpectedEventNo() const {
+     uint32_t getNextExpectedEventNo() const {
         return nextExpectedEventNo;
     }
 
@@ -235,13 +235,13 @@ public:
 
     virtual void encode(WritePacket &packet) const = 0;
 
-    [[nodiscard]] virtual size_t getSize() const {
+     virtual size_t getSize() const {
         return 1; // Typ has only one byte.
     };
 
     virtual ~EventData() = default;
 
-    [[nodiscard]] ServerEventType getType() const {
+     ServerEventType getType() const {
         return type;
     }
 
@@ -289,19 +289,19 @@ public:
 
     static std::shared_ptr<EventData> decode(ReadPacket &packet, uint32_t eventDataLen);
 
-    [[nodiscard]] uint32_t getX() const {
+     uint32_t getX() const {
         return x;
     }
 
-    [[nodiscard]] uint32_t getY() const {
+     uint32_t getY() const {
         return y;
     }
 
-    [[nodiscard]] const std::vector<std::string> &getPlayerNames() const {
+     const std::vector<std::string> &getPlayerNames() const {
         return playerNames;
     }
 
-    [[nodiscard]] size_t getPlayerNameSize() const {
+     size_t getPlayerNameSize() const {
         return playerNameSize;
     }
 
@@ -361,7 +361,7 @@ public:
 
     void encode(WritePacket &packet) const override;
 
-    [[nodiscard]] size_t getSize() const override {
+     size_t getSize() const override {
         return sizeof(playerNumber) + EventData::getSize();
     }
 
@@ -452,15 +452,15 @@ public:
         return record;
     }
 
-    [[nodiscard]] const std::shared_ptr<EventData> &getEventData() const {
+     const std::shared_ptr<EventData> &getEventData() const {
         return eventData;
     }
 
-    [[nodiscard]] uint32_t getEventNo() const {
+     uint32_t getEventNo() const {
         return eventNo;
     }
 
-    [[nodiscard]] ServerEventType getEventType() const {
+     ServerEventType getEventType() const {
         return eventData->getType();
     }
 

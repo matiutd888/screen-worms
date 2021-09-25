@@ -69,11 +69,11 @@ public:
         offset = 0;
     }
 
-    [[nodiscard]] size_t getRemainingSize() const {
+     size_t getRemainingSize() const {
         return MAX_SIZE - offset;
     }
 
-    [[nodiscard]] size_t getOffset() const {
+     size_t getOffset() const {
         return offset;
     }
 
@@ -114,7 +114,7 @@ public:
         this->offset = offset;
     }
 
-    [[nodiscard]] size_t getRemainingSize() const {
+     size_t getRemainingSize() const {
         return size - offset;
     }
 

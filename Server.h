@@ -138,11 +138,11 @@ public:
 
     void handleClient(Client &newClient, const ClientMessage &newMsg);
 
-    [[nodiscard]] bool clientExists(const Client &client) const {
+     bool clientExists(const Client &client) const {
         return clients.find(client) != clients.end();
     }
 
-    [[nodiscard]] bool hasMessages() const {
+     bool hasMessages() const {
         return queue.hasMessages();
     }
 

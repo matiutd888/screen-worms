@@ -50,7 +50,7 @@ public:
 
     void setDirection(TurnDirection direction);
 
-    [[nodiscard]] TurnDirection getEnteredDirection() const {
+     TurnDirection getEnteredDirection() const {
         return enteredDirection;
     }
 

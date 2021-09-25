@@ -41,7 +41,7 @@ public:
         return false;
     }
 
-    [[nodiscard]] int getDescriptor(int index) const;
+     int getDescriptor(int index) const;
 
     void closeAllDescriptors() {
         for (auto &i : pollData) {

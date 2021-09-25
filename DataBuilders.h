@@ -33,27 +33,27 @@ public:
         return os;
     }
 
-    [[nodiscard]] uint32_t getWidth() const {
+     uint32_t getWidth() const {
         return width;
     }
 
-    [[nodiscard]] uint32_t getHeight() const {
+     uint32_t getHeight() const {
         return height;
     }
 
-    [[nodiscard]] int getTuriningSpeed() const {
+     int getTuriningSpeed() const {
         return turiningSpeed;
     }
 
-    [[nodiscard]] uint16_t getPortNum() const {
+     uint16_t getPortNum() const {
         return portNum;
     }
 
-    [[nodiscard]] uint32_t getSeed() const {
+     uint32_t getSeed() const {
         return seed;
     }
 
-    [[nodiscard]] int getRoundsPerSec() const {
+     int getRoundsPerSec() const {
         return roundsPerSec;
     }
 };
@@ -78,7 +78,7 @@ public:
 
     void parse(int argc, char **argv);
 
-    [[nodiscard]] ServerData build() const {
+     ServerData build() const {
         return ServerData(width, height, turiningSpeed, portNum, seed, roundsPerSec);
     }
 };
@@ -104,23 +104,23 @@ public:
         return os;
     }
 
-    [[nodiscard]] const std::string &getServerAddress() const {
+     const std::string &getServerAddress() const {
         return serverAddress;
     }
 
-    [[nodiscard]] const std::string &getPlayerName() const {
+     const std::string &getPlayerName() const {
         return playerName;
     }
 
-    [[nodiscard]] uint16_t getServerPortNum() const {
+     uint16_t getServerPortNum() const {
         return serverPortNum;
     }
 
-    [[nodiscard]] const std::string &getGuiAddress() const {
+     const std::string &getGuiAddress() const {
         return guiAddress;
     }
 
-    [[nodiscard]] uint16_t getGuiPortNum() const {
+     uint16_t getGuiPortNum() const {
         return guiPortNum;
     }
 };
